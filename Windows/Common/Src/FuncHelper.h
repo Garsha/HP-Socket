@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,9 +59,13 @@ inline int ENSURE_ERROR(int def_code)	{int __le_ = ::GetLastError(); if(__le_ ==
 #define ENSURE_ERROR_CANCELLED			ENSURE_ERROR(ERROR_CANCELLED)
 #define TRIGGER(expr)					EXECUTE_RESET_ERROR((expr))
 
-#define CreateLocalObjects(T, n)		((T*)alloca(sizeof(T) * n))
+#define CreateLocalObjects(T, n)		((T*)alloca(sizeof(T) * (n)))
 #define CreateLocalObject(T)			CreateLocalObjects(T, 1)
 #define CallocObjects(T, n)				((T*)calloc((n), sizeof(T)))
+
+#define MALLOC(T, n)					((T*)malloc(sizeof(T) * (n)))
+#define REALLOC(p, T, n)				((T*)realloc((PVOID)(p), sizeof(T) * (n)))
+#define FREE(p)							free((PVOID)(p))
 
 #define ERROR_EXIT2(code, err)			EXIT((code), (err), __FILE__, __LINE__, __FUNCTION__)
 #define ERROR__EXIT2(code, err)			_EXIT((code), (err), __FILE__, __LINE__, __FUNCTION__)
@@ -90,15 +94,33 @@ typedef HANDLE							FD;
 
 inline BOOL IsStrEmptyA(LPCSTR lpsz)	{return (lpsz == nullptr || lpsz[0] == 0);}
 inline BOOL IsStrEmptyW(LPCWSTR lpsz)	{return (lpsz == nullptr || lpsz[0] == 0);}
+inline BOOL IsStrNotEmptyA(LPCSTR lpsz)	{return !IsStrEmptyA(lpsz);}
+inline BOOL IsStrNotEmptyW(LPCWSTR lpsz){return !IsStrEmptyW(lpsz);}
 inline LPCSTR SafeStrA(LPCSTR lpsz)		{return (lpsz != nullptr) ? lpsz : "";}
 inline LPCWSTR SafeStrW(LPCWSTR lpsz)	{return (lpsz != nullptr) ? lpsz : L"";}
 
 #ifdef _UNICODE
-	#define IsStrEmpty					IsStrEmptyW
-	#define SafeStr						SafeStrW
+	#define IsStrEmpty(lpsz)			IsStrEmptyW(lpsz)
+	#define IsStrNotEmpty(lpsz)			IsStrNotEmptyW(lpsz)
+	#define SafeStr(lpsz)				SafeStrW(lpsz)
 #else
-	#define IsStrEmpty					IsStrEmptyA
-	#define SafeStr						SafeStrA
+	#define IsStrEmpty(lpsz)			IsStrEmptyA(lpsz)
+	#define IsStrNotEmpty(lpsz)			IsStrNotEmptyA(lpsz)
+	#define SafeStr(lpsz)				SafeStrA(lpsz)
+#endif
+
+#define ARRAY_SIZE(arr)					_countof(arr)
+
+#ifndef __countof
+	#define __countof(arr)				ARRAY_SIZE(arr)
+#endif
+
+#ifndef MAX
+	#define MAX(a,b)					max(a,b)
+#endif
+
+#ifndef MIN
+	#define MIN(a,b)					min(a,b)
 #endif
 
 template<typename T> inline bool IS_HAS_ERROR(T v)

@@ -2,6 +2,8 @@
 
 echo --------------------------------------------------
 
+call copy.bat
+
 set all=%1
 
 del *.ilk /f /s /q
@@ -21,10 +23,14 @@ for /f "delims=" %%i in ('dir /ad /b /s "obj"') do (
    rd /s /q "%%i"
 )
 
+for /f "delims=" %%i in ('dir /ad /b /s "netstandard2.0"') do (
+   rd /s /q "%%i"
+)
+
 rd /s /q "Demo\Debug"
 
-rd /s /q "Demo\Other Languages Demos\C#\HPSocketCS\bin\Debug"
-rd /s /q "Demo\Other Languages Demos\C#\HPSocketCS\bin\Release"
+rd /s /q "Other Languages\C#\HPSocketCS\bin\Debug"
+rd /s /q "Other Languages\C#\HPSocketCS\bin\Release"
 
 set /a x=0
 
@@ -44,9 +50,7 @@ if %x% geq 1 (
 	del *.pdb /f /s /q
 )
 
-del "Demo\Other Languages Demos\E\*.exe" /f /s /q
-
-call copy.bat
+del "Other Languages\E\*.exe" /f /s /q
 
 echo --------------------------------------------------
 echo bye~ bye~

@@ -51,7 +51,7 @@
 #define HEAD_CONN		"Connection"
 #define HEAD_PROXY_CONN	"Proxy-Connection"
 #define HEAD_PROXY_AUTH	"Prxoy-Authenticate"
-#define HTTPS_RESP		"HTTP/1.1 200 Connection Established\r\n\r\n"
+#define HTTPS_RESP		"HTTP/1.1 200 Connection Established\r\nContent-Length: 0\r\n\r\n"
 #define IE_OPT_DIALOG	"rundll32.exe shell32.dll, Control_RunDLL inetcpl.cpl, , 4"
 
 static int HEADER_SEP_LEN		= (int)strlen(HEADER_SEP);

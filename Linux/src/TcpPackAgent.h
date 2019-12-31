@@ -42,6 +42,7 @@ template<class T> class CTcpPackAgentT : public IPackSocket, public T
 
 public:
 	using __super::Stop;
+	using __super::GetState;
 
 public:
 	virtual BOOL SendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCount)
@@ -107,6 +108,26 @@ protected:
 		return result;
 	}
 
+	virtual BOOL BeforeUnpause(TAgentSocketObj* pSocketObj)
+	{
+		CReentrantCriSecLock locallock(pSocketObj->csIo);
+
+		if(!TAgentSocketObj::IsValid(pSocketObj))
+			return FALSE;
+
+		if(pSocketObj->IsPaused())
+			return TRUE;
+
+		TBufferPackInfo* pInfo = nullptr;
+		GetConnectionReserved(pSocketObj, (PVOID*)&pInfo);
+		ASSERT(pInfo);
+
+		TBuffer* pBuffer = (TBuffer*)pInfo->pBuffer;
+		ASSERT(pBuffer && pBuffer->IsValid());
+
+		return (ParsePack(this, pInfo, pBuffer, pSocketObj, m_dwMaxPackSize, m_usHeaderFlag) != HR_ERROR);
+	}
+
 	virtual BOOL CheckParams()
 	{
 		if	((m_dwMaxPackSize > 0 && m_dwMaxPackSize <= TCP_PACK_MAX_SIZE_LIMIT)	&&
@@ -143,7 +164,7 @@ private:
 		{return __super::DoFireReceive(pSocketObj, pData, iLength);}
 
 	friend EnHandleResult ParsePack<>	(CTcpPackAgentT* pThis, TBufferPackInfo* pInfo, TBuffer* pBuffer, TAgentSocketObj* pSocket,
-										DWORD dwMaxPackSize, USHORT usPackHeaderFlag, const BYTE* pData, int iLength);
+										DWORD dwMaxPackSize, USHORT usPackHeaderFlag);
 
 public:
 	CTcpPackAgentT(ITcpAgentListener* pListener)
@@ -156,7 +177,7 @@ public:
 
 	virtual ~CTcpPackAgentT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:

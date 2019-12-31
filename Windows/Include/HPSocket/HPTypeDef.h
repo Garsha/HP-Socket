@@ -25,13 +25,21 @@
 
 /* HP-Socket 版本号 */
 #define HP_VERSION_MAJOR		5	// 主版本号
-#define HP_VERSION_MINOR		3	// 子版本号
-#define HP_VERSION_REVISE		2	// 修正版本号
+#define HP_VERSION_MINOR		6	// 子版本号
+#define HP_VERSION_REVISE		4	// 修正版本号
 #define HP_VERSION_BUILD		1	// 构建编号
 
+//#define _UDP_DISABLED				// 禁用 UDP
 //#define _SSL_DISABLED				// 禁用 SSL
 //#define _HTTP_DISABLED			// 禁用 HTTP
 //#define _ZLIB_DISABLED			// 禁用 ZLIB
+
+/* 是否启用 UDP，如果定义了 _UDP_DISABLED 则禁用（默认：启用） */
+#if !defined(_UDP_DISABLED)
+	#ifndef _UDP_SUPPORT
+		#define _UDP_SUPPORT
+	#endif
+#endif
 
 /* 是否启用 SSL，如果定义了 _SSL_DISABLED 则禁用（默认：启用） */
 #if !defined(_SSL_DISABLED)
@@ -133,10 +141,9 @@ typedef enum EnFetchResult
 名称：数据发送策略
 描述：Server 组件和 Agent 组件的数据发送策略
 
-* 打包模式（默认）	：尽量把多个发送操作的数据组合在一起发送，增加传输效率
-* 安全模式			：尽量把多个发送操作的数据组合在一起发送，并控制传输速度，避免缓冲区溢出
-* 直接模式			：对每一个发送操作都直接投递，适用于负载不高但要求实时性较高的场合
-
+* 打包发送策略（默认）	：尽量把多个发送操作的数据组合在一起发送，增加传输效率
+* 安全发送策略			：尽量把多个发送操作的数据组合在一起发送，并控制传输速度，避免缓冲区溢出
+* 直接发送策略			：对每一个发送操作都直接投递，适用于负载不高但要求实时性较高的场合
 ************************************************************************/
 typedef enum EnSendPolicy
 {
@@ -144,6 +151,21 @@ typedef enum EnSendPolicy
 	SP_SAFE				= 1,	// 安全模式
 	SP_DIRECT			= 2,	// 直接模式
 } En_HP_SendPolicy;
+
+/************************************************************************
+名称：OnSend 事件同步策略
+描述：Server 组件和 Agent 组件的 OnSend 事件同步策略
+
+* 不同步（默认）	：不同步 OnSend 事件，可能同时触发 OnReceive 和 OnClose 事件
+* 同步 OnClose	：只同步 OnClose 事件，可能同时触发 OnReceive 事件
+* 同步 OnReceive	：（只用于 TCP 组件）同步 OnReceive 和 OnClose 事件，不可能同时触发 OnReceive 或 OnClose 事件
+************************************************************************/
+typedef enum EnOnSendSyncPolicy
+{
+	OSSP_NONE			= 0,	// 不同步（默认）
+	OSSP_CLOSE			= 1,	// 同步 OnClose
+	OSSP_RECEIVE		= 2,	// 同步 OnReceive（只用于 TCP 组件）	
+} En_HP_OnSendSyncPolicy;
 
 /************************************************************************
 名称：操作结果代码
@@ -202,6 +224,73 @@ typedef struct TIPAddr
 	LPCTSTR		 address;
 } *LPTIPAddr, HP_TIPAddr, *HP_LPTIPAddr;
 
+/************************************************************************
+名称：拒绝策略
+描述：调用被拒绝后的处理策略
+************************************************************************/
+typedef enum EnRejectedPolicy
+{
+	TRP_CALL_FAIL	= 0,	// 立刻返回失败
+	TRP_WAIT_FOR	= 1,	// 等待（直到成功、超时或线程池关闭等原因导致失败）
+	TRP_CALLER_RUN	= 2,	// 调用者线程直接执行
+} En_HP_RejectedPolicy;
+
+/************************************************************************
+名称：任务缓冲区类型
+描述：TSockeTask 对象创建和销毁时，根据不同类型的缓冲区类型作不同的处理
+************************************************************************/
+typedef enum EnTaskBufferType
+{
+	TBT_COPY	= 0,	// 深拷贝
+	TBT_REFER	= 1,	// 浅拷贝
+	TBT_ATTACH	= 2,	// 附属（不负责创建，但负责销毁）
+} En_HP_TaskBufferType;
+
+/************************************************************************
+名称：任务处理函数
+描述：任务处理入口函数
+参数：pvArg -- 自定义参数
+返回值：（无）
+************************************************************************/
+typedef VOID (__HP_CALL *Fn_TaskProc)(PVOID pvArg);
+typedef Fn_TaskProc	HP_Fn_TaskProc;
+
+struct TSocketTask;
+
+/************************************************************************
+名称：Socket 任务处理函数
+描述：Socket 任务处理入口函数
+参数：pTask -- Socket 任务结构体指针
+返回值：（无）
+************************************************************************/
+typedef VOID (__HP_CALL *Fn_SocketTaskProc)(TSocketTask* pTask);
+typedef Fn_SocketTaskProc	HP_Fn_SocketTaskProc;
+
+/************************************************************************
+名称：Socket 任务结构体
+描述：封装 Socket 任务相关数据结构
+************************************************************************/
+typedef struct TSocketTask
+{
+	Fn_SocketTaskProc	fn;			// 任务处理函数
+	PVOID				sender;		// 发起对象
+	CONNID				connID;		// 连接 ID
+	LPCBYTE				buf;		// 数据缓冲区
+	INT					bufLen;		// 数据缓冲区长度
+	EnTaskBufferType	bufType;	// 缓冲区类型
+	WPARAM				wparam;		// 自定义参数
+	LPARAM				lparam;		// 自定义参数
+} *LPTSocketTask, HP_TSocketTask, *HP_LPTSocketTask;
+
+/************************************************************************
+名称：获取 HPSocket 版本号
+描述：版本号（4 个字节分别为：主版本号，子版本号，修正版本号，构建编号）
+************************************************************************/
+inline DWORD GetHPSocketVersion()
+{
+	return (HP_VERSION_MAJOR << 24) | (HP_VERSION_MINOR << 16) | (HP_VERSION_REVISE << 8) | HP_VERSION_BUILD;
+}
+
 /*****************************************************************************************************************************************************/
 /**************************************************************** SSL Type Definitions ***************************************************************/
 /*****************************************************************************************************************************************************/
@@ -231,18 +320,44 @@ typedef enum EnSSLVerifyMode
 } En_HP_SSLVerifyMode;
 
 /************************************************************************
+名称：SSL Session 信息类型
+描述：用于 GetSSLSessionInfo()，标识输出的 Session 信息类型
+************************************************************************/
+typedef enum EnSSLSessionInfo
+{
+	SSL_SSI_MIN					= 0,	// 
+	SSL_SSI_CTX					= 0,	// SSL CTX				（输出类型：SSL_CTX*）
+	SSL_SSI_CTX_METHOD			= 1,	// SSL CTX Mehtod		（输出类型：SSL_METHOD*）
+	SSL_SSI_CTX_CIPHERS			= 2,	// SSL CTX Ciphers		（输出类型：STACK_OF(SSL_CIPHER)*）
+	SSL_SSI_CTX_CERT_STORE		= 3,	// SSL CTX Cert Store	（输出类型：X509_STORE*）
+	SSL_SSI_SERVER_NAME_TYPE	= 4,	// Server Name Type		（输出类型：int）
+	SSL_SSI_SERVER_NAME			= 5,	// Server Name			（输出类型：LPCSTR）
+	SSL_SSI_VERSION				= 6,	// SSL Version			（输出类型：LPCSTR）
+	SSL_SSI_METHOD				= 7,	// SSL Method			（输出类型：SSL_METHOD*）
+	SSL_SSI_CERT				= 8,	// SSL Cert				（输出类型：X509*）
+	SSL_SSI_PKEY				= 9,	// SSL Private Key		（输出类型：EVP_PKEY*）
+	SSL_SSI_CURRENT_CIPHER		= 10,	// SSL Current Cipher	（输出类型：SSL_CIPHER*）
+	SSL_SSI_CIPHERS				= 11,	// SSL Available Ciphers（输出类型：STACK_OF(SSL_CIPHER)*）
+	SSL_SSI_CLIENT_CIPHERS		= 12,	// SSL Client Ciphers	（输出类型：STACK_OF(SSL_CIPHER)*）
+	SSL_SSI_PEER_CERT			= 13,	// SSL Peer Cert		（输出类型：X509*）
+	SSL_SSI_PEER_CERT_CHAIN		= 14,	// SSL Peer Cert Chain	（输出类型：STACK_OF(X509)*）
+	SSL_SSI_VERIFIED_CHAIN		= 15,	// SSL Verified Chain	（输出类型：STACK_OF(X509)*）
+	SSL_SSI_MAX					= 15,	// 
+} En_HP_SSLSessionInfo;
+
+/************************************************************************
 名称：SNI 服务名称回调函数
 描述：根据服务器名称选择 SSL 证书
 参数：	
 		lpszServerName -- 服务器名称（域名）
 
 返回值：
-		0	 -- 成功，使用默认 SSL 证书
-		正数	 -- 成功，使用返回值对应的 SNI 主机证书
+		0	 -- 成功，使用默认 SSL 证书索引
+		正数	 -- 成功，使用返回值对应的 SNI 主机证书索引
 		负数	 -- 失败，中断 SSL 握手
 
 ************************************************************************/
-typedef int (CALLBACK *Fn_SNI_ServerNameCallback)(LPCTSTR lpszServerName);
+typedef int (__HP_CALL *Fn_SNI_ServerNameCallback)(LPCTSTR lpszServerName, PVOID pContext);
 typedef Fn_SNI_ServerNameCallback	HP_Fn_SNI_ServerNameCallback;
 
 #endif
@@ -390,17 +505,8 @@ typedef struct TNVPair
 	LPCSTR name;
 	LPCSTR value;
 }	HP_TNVPair,
-	TParam, HP_TParam, *LPPARAM, *HP_LPPARAM,
-	THeader, HP_THeader, *LPHEADER, *HP_LPHEADER,
-	TCookie, HP_TCookie, *LPCOOKIE, *HP_LPCOOKIE;
+TParam, HP_TParam, *LPPARAM, *HP_LPPARAM,
+THeader, HP_THeader, *LPHEADER, *HP_LPHEADER,
+TCookie, HP_TCookie, *LPCOOKIE, *HP_LPCOOKIE;
 
 #endif
-
-/************************************************************************
-名称：获取 HPSocket 版本号
-描述：版本号（4 个字节分别为：主版本号，子版本号，修正版本号，构建编号）
-************************************************************************/
-inline DWORD GetHPSocketVersion()
-{
-	return (HP_VERSION_MAJOR << 24) | (HP_VERSION_MINOR << 16) | (HP_VERSION_REVISE << 8) | HP_VERSION_BUILD;
-}

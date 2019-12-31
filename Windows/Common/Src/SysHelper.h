@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,24 @@
 
 #pragma once
 
+typedef DWORD							TID, THR_ID, NTHR_ID, PID, PRO_ID;
+
 /* 最大工作线程数 */
-#define MAX_WORKER_THREAD_COUNT			500
-#define DEFAULT_BUFFER_SIZE				(GetDefaultBufferSize())
+#define MAX_WORKER_THREAD_COUNT			512
+/* 默认对象缓存对象锁定时间 */
+#define DEFAULT_OBJECT_CACHE_LOCK_TIME	(20 * 1000)
+/* 默认对象缓存池大小 */
+#define DEFAULT_OBJECT_CACHE_POOL_SIZE	600
+/* 默认对象缓存池回收阀值 */
+#define DEFAULT_OBJECT_CACHE_POOL_HOLD	600
+/* 默认内存块缓存容量 */
+#define DEFAULT_BUFFER_CACHE_CAPACITY	4096
+/* 默认内存块缓存池大小 */
+#define DEFAULT_BUFFER_CACHE_POOL_SIZE	1024
+/* 默认内存块缓存池回收阀值 */
+#define DEFAULT_BUFFER_CACHE_POOL_HOLD	1024
+
+#define SYS_PAGE_SIZE					(GetSysPageSize())
 #define DEFAULT_WORKER_THREAD_COUNT		(GetDefaultWorkerThreadCount())
 #define SELF_PROCESS_ID					(::GetCurrentProcessId())
 #define SELF_THREAD_ID					(::GetCurrentThreadId())
@@ -34,7 +49,7 @@
 #define IsSameProcess(pid1, pid2)		((pid1) == (pid2))
 #define IsSelfProcess(pid)				IsSameProcess((pid), SELF_PROCESS_ID)
 
-DWORD GetDefaultBufferSize();
+DWORD GetSysPageSize();
 DWORD GetDefaultWorkerThreadCount();
 
 // 获取系统信息
@@ -43,12 +58,3 @@ VOID SysGetSystemInfo(LPSYSTEM_INFO pInfo);
 DWORD SysGetNumberOfProcessors();
 // 获取页面大小
 DWORD SysGetPageSize();
-
-#if _MSC_VER < 1800
-
-// 获取操作系统版本
-BOOL SysGetOSVersionInfo(LPOSVERSIONINFO pInfo, BOOL bInfoEx = FALSE);
-// 获取操作系统版本（高位双字节：主版本号；低位双字节：副版本号）
-DWORD SysGetOSVersion();
-
-#endif

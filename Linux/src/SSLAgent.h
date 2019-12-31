@@ -36,22 +36,40 @@ public:
 	virtual BOOL IsSecure() {return TRUE;}
 	virtual BOOL SendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCount);
 
-	virtual BOOL SetupSSLContext(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPasswod = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)
-		{return m_sslCtx.Initialize(SSL_SM_CLIENT, iVerifyMode, lpszPemCertFile, lpszPemKeyFile, lpszKeyPasswod, lpszCAPemCertFileOrPath, nullptr);}
+	virtual BOOL SetupSSLContext(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPassword = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)
+		{return m_sslCtx.Initialize(SSL_SM_CLIENT, iVerifyMode, FALSE, (LPVOID)lpszPemCertFile, (LPVOID)lpszPemKeyFile, (LPVOID)lpszKeyPassword, (LPVOID)lpszCAPemCertFileOrPath, nullptr);}
+
+	virtual BOOL SetupSSLContextByMemory(int iVerifyMode = SSL_VM_NONE, LPCSTR lpszPemCert = nullptr, LPCSTR lpszPemKey = nullptr, LPCSTR lpszKeyPassword = nullptr, LPCSTR lpszCAPemCert = nullptr)
+		{return m_sslCtx.Initialize(SSL_SM_CLIENT, iVerifyMode, TRUE, (LPVOID)lpszPemCert, (LPVOID)lpszPemKey, (LPVOID)lpszKeyPassword, (LPVOID)lpszCAPemCert, nullptr);}
+
+
 	virtual void CleanupSSLContext()
 		{m_sslCtx.Cleanup();}
+
+	virtual BOOL StartSSLHandShake(CONNID dwConnID);
+
+public:
+	virtual void SetSSLAutoHandShake(BOOL bAutoHandShake)	{m_bSSLAutoHandShake = bAutoHandShake;}
+	virtual BOOL IsSSLAutoHandShake	()						{return m_bSSLAutoHandShake;}
+
+	virtual BOOL GetSSLSessionInfo(CONNID dwConnID, EnSSLSessionInfo enInfo, LPVOID* lppInfo);
 
 protected:
 	virtual EnHandleResult FireConnect(TAgentSocketObj* pSocketObj);
 	virtual EnHandleResult FireReceive(TAgentSocketObj* pSocketObj, const BYTE* pData, int iLength);
 	virtual EnHandleResult FireClose(TAgentSocketObj* pSocketObj, EnSocketOperation enOperation, int iErrorCode);
-	virtual EnHandleResult FireShutdown();
 
 	virtual BOOL CheckParams();
 	virtual void PrepareStart();
 	virtual void Reset();
 
-	virtual void OnWorkerThreadEnd(DWORD dwThreadID);
+	virtual void OnWorkerThreadEnd(THR_ID dwThreadID);
+
+protected:
+	virtual BOOL StartSSLHandShake(TAgentSocketObj* pSocketObj);
+
+private:
+	void DoSSLHandShake(TAgentSocketObj* pSocketObj);
 
 private:
 	friend EnHandleResult ProcessHandShake<>(CSSLAgent* pThis, TAgentSocketObj* pSocketObj, CSSLSession* pSession);
@@ -62,16 +80,19 @@ public:
 	CSSLAgent(ITcpAgentListener* pListener)
 	: CTcpAgent(pListener)
 	, m_sslPool(m_sslCtx)
+	, m_bSSLAutoHandShake(TRUE)
 	{
 
 	}
 
 	virtual ~CSSLAgent()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
+	BOOL m_bSSLAutoHandShake;
+
 	CSSLContext m_sslCtx;
 	CSSLSessionPool m_sslPool;
 };

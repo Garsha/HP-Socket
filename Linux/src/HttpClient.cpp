@@ -82,24 +82,82 @@ template<class R, class T, USHORT default_port> BOOL CHttpClientT<R, T, default_
 	return SendRequest(lpszMethod, lpszPath, lpHeaders, iHeaderCount, (BYTE*)fmap, (int)fmap.Size());
 }
 
-template<class R, class T, USHORT default_port> BOOL CHttpClientT<R, T, default_port>::SendWSMessage(BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+template<class R, class T, USHORT default_port> BOOL CHttpClientT<R, T, default_port>::SendChunkData(const BYTE* pData, int iLength, LPCSTR lpszExtensions)
 {
+	char szLen[12];
+	WSABUF bufs[5];
+
+	int iCount = MakeChunkPackage(pData, iLength, lpszExtensions, szLen, bufs);
+
+	return SendPackets(bufs, iCount);
+}
+
+template<class R, class T, USHORT default_port> BOOL CHttpClientT<R, T, default_port>::SendWSMessage(BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], const BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+{
+	ASSERT(lpszMask);
+
 	WSABUF szBuffer[2];
 	BYTE szHeader[HTTP_MAX_WS_HEADER_LEN];
 
-	if(!::MakeWSPacket(bFinal, iReserved, iOperationCode, lpszMask, pData, iLength, ullBodyLen, szHeader, szBuffer))
+	unique_ptr<BYTE[]> szData = make_unique<BYTE[]>(iLength);
+	memcpy(szData.get(), pData, iLength);
+
+	if(!::MakeWSPacket(bFinal, iReserved, iOperationCode, lpszMask, szData.get(), iLength, ullBodyLen, szHeader, szBuffer))
 		return FALSE;
 
 	return SendPackets(szBuffer, 2);
 }
 
+template<class R, class T, USHORT default_port> BOOL CHttpClientT<R, T, default_port>::StartHttp()
+{
+	if(IsHttpAutoStart())
+	{
+		::SetLastError(ERROR_INVALID_OPERATION);
+		return FALSE;
+	}
+
+	if(!IsConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CReentrantCriSecLock locallock(m_csHttp);
+
+	if(!IsConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	if(m_objHttp.IsValid())
+	{
+		::SetLastError(ERROR_ALREADY_INITIALIZED);
+		return FALSE;
+	}
+
+	DoStartHttp();
+
+	if(!IsSecure())
+		FireHandShake();
+	else
+	{
+#ifdef _SSL_SUPPORT
+		if(IsSSLAutoHandShake())
+			StartSSLHandShakeNoCheck();
+#endif
+	}
+
+	return TRUE;
+}
+
 // ------------------------------------------------------------------------------------------------------------- //
 
-template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::Start(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect, LPCTSTR lpszBindAddress)
+template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::Start(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect, LPCTSTR lpszBindAddress, USHORT usLocalPort)
 {
 	CleanupRequestResult();
 
-	if(!__super::Start(lpszRemoteAddress, usPort, TRUE, lpszBindAddress))
+	if(!__super::Start(lpszRemoteAddress, usPort, TRUE, lpszBindAddress, usLocalPort))
 		return FALSE;
 
 	BOOL isOK = WaitForEvent(m_dwConnectTimeout);
@@ -140,7 +198,7 @@ template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::S
 	return TRUE;
 }
 
-template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::SendWSMessage(BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::SendWSMessage(BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], const BYTE* pData, int iLength, ULONGLONG ullBodyLen)
 {
 	CleanupRequestResult();
 
@@ -169,6 +227,12 @@ template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::O
 	USHORT		usPort;
 	CStringA	strHost;
 	CStringA	strPath;
+
+	if(!IsHttpAutoStart())
+	{
+		SetLastError(SE_INVALID_PARAM, __FUNCTION__, ERROR_NOT_SUPPORTED);
+		return FALSE;
+	}
 
 	if(!::ParseUrl(lpszUrl, bHttps, strHost, usPort, strPath))
 	{
@@ -209,7 +273,7 @@ template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::O
 		{
 			do 
 			{
-				::Sleep(50);
+				::WaitFor(10);
 				state = GetState();
 			} while(state != SS_STARTED && state != SS_STOPPED);
 		}
@@ -217,7 +281,7 @@ template<class T, USHORT default_port> BOOL CHttpSyncClientT<T, default_port>::O
 		{
 			while(state != SS_STOPPED)
 			{
-				::Sleep(50);
+				::WaitFor(10);
 				state = GetState();
 			}
 
@@ -427,6 +491,16 @@ template<class T, USHORT default_port> EnHandleResult CHttpSyncClientT<T, defaul
 
 	if(m_pListener2 != nullptr)
 		return m_pListener2->OnSend(pSender, dwConnID, pData, iLength);
+
+	return rs;
+}
+
+template<class T, USHORT default_port> EnHandleResult CHttpSyncClientT<T, default_port>::OnReceive(ITcpClient* pSender, CONNID dwConnID, const BYTE* pData, int iLength)
+{
+	EnHandleResult rs = HR_OK;
+
+	if(m_pListener2 != nullptr)
+		return m_pListener2->OnReceive(pSender, dwConnID, pData, iLength);
 
 	return rs;
 }

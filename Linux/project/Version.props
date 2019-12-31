@@ -3,8 +3,8 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <VER_MAJOR>5</VER_MAJOR>
-    <VER_MINOR>3</VER_MINOR>
-    <VER_REVISE>2</VER_REVISE>
+    <VER_MINOR>6</VER_MINOR>
+    <VER_REVISE>4</VER_REVISE>
     <VER_BUILD>1</VER_BUILD>
   </PropertyGroup>
   <PropertyGroup />

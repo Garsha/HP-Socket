@@ -44,7 +44,12 @@ public:
 protected:
 	virtual EnHandleResult DoFireReceive(ITcpClient* pSender, const BYTE* pData, int iLength)
 	{
-		return ParsePack(this, &m_pkInfo, &m_lsBuffer, pSender, m_dwMaxPackSize, m_usHeaderFlag, pData, iLength);
+		return ParsePack(this, &m_pkInfo, &m_lsBuffer, (CTcpPackClientT*)pSender, m_dwMaxPackSize, m_usHeaderFlag, pData, iLength);
+	}
+
+	virtual BOOL BeforeUnpause()
+	{
+		return (ParsePack(this, &m_pkInfo, &m_lsBuffer, (CTcpPackClientT*)this, m_dwMaxPackSize, m_usHeaderFlag) != HR_ERROR);
 	}
 
 	virtual BOOL CheckParams()
@@ -75,8 +80,8 @@ private:
 	EnHandleResult DoFireSuperReceive(ITcpClient* pSender, const BYTE* pData, int iLength)
 		{return __super::DoFireReceive(pSender, pData, iLength);}
 
-	friend EnHandleResult ParsePack<>	(CTcpPackClientT* pThis, TPackInfo<TItemListEx>* pInfo, TItemListEx* pBuffer, ITcpClient* pSocket,
-										DWORD dwMaxPackSize, USHORT usPackHeaderFlag, const BYTE* pData, int iLength);
+	friend EnHandleResult ParsePack<>	(CTcpPackClientT* pThis, TPackInfo<TItemListEx>* pInfo, TItemListEx* pBuffer, CTcpPackClientT* pSocket,
+										DWORD dwMaxPackSize, USHORT usPackHeaderFlag);
 
 public:
 	CTcpPackClientT(ITcpClientListener* pListener)
@@ -91,7 +96,7 @@ public:
 
 	virtual ~CTcpPackClientT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:

@@ -41,6 +41,7 @@ template<class T> class CTcpPullServerT : public IPullSocket, public T
 
 public:
 	using __super::Stop;
+	using __super::GetState;
 
 public:
 	virtual EnFetchResult Fetch(CONNID dwConnID, BYTE* pData, int iLength)
@@ -86,7 +87,6 @@ protected:
 
 		TBuffer* pBuffer = nullptr;
 		GetConnectionReserved(pSocketObj, (PVOID*)&pBuffer);
-		ASSERT(pBuffer);
 
 		if(pBuffer != nullptr)
 			m_bfPool.PutFreeBuffer(pBuffer);
@@ -127,7 +127,7 @@ public:
 
 	virtual ~CTcpPullServerT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:

@@ -2,11 +2,11 @@
 * Copyright: JessMA Open Source (ldcsaa@gmail.com)
 *
 * Author	: Bruce Liang
-* Website	: http://www.jessma.org
-* Project	: https://github.com/ldcsaa
+* Website	: https://github.com/ldcsaa
+* Project	: https://github.com/ldcsaa/HP-Socket
 * Blog		: http://www.cnblogs.com/ldcsaa
 * Wiki		: http://www.oschina.net/p/hp-socket
-* QQ Group	: 75375912, 44636872
+* QQ Group	: 44636872, 75375912
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -39,17 +39,21 @@
 #define ERROR_IO_PENDING				EINPROGRESS
 #define ERROR_INTR						EINTR
 #define ERROR_EMPTY						ENODATA
+#define ERROR_NO_DATA					ENODATA
 #define ERROR_FILE_TOO_LARGE			EFBIG
 #define ERROR_INVALID_OPERATION			EPERM
 #define ERROR_CANCELLED					ECANCELED
 #define ERROR_UNKNOWN					ENOMSG
 #define ERROR_OBJECT_NOT_FOUND			EBADSLT
+#define ERROR_NOT_FOUND					EBADSLT
 #define ERROR_INVALID_INDEX				ENOANO
 #define ERROR_OPERATION_ABORTED			ECANCELED
 #define ERROR_CONNABORTED				ECONNABORTED
 #define ERROR_ADDRNOTAVAIL				EADDRNOTAVAIL
+#define ERROR_INCORRECT_ADDRESS			EADDRNOTAVAIL
 #define ERROR_PFNOSUPPORT				EPFNOSUPPORT
 #define ERROR_AFNOSUPPORT				EAFNOSUPPORT
+#define ERROR_TIMEOUT					ETIMEDOUT
 #define ERROR_TIMEDOUT					ETIMEDOUT
 #define	ERROR_PROTO						EPROTO
 #define ERROR_CONNECTION_COUNT_LIMIT	ENOSR
@@ -69,8 +73,11 @@
 #define ERROR_INVALID_PASSWORD			EACCES
 #define ERROR_INVALID_ACCESS			EACCES
 #define ERROR_NOT_READY					EPERM
+#define ERROR_NOT_SUPPORTED				EPERM
 #define ERROR_BAD_FORMAT				EBADMSG
 #define ERROR_BUFFER_OVERFLOW			E2BIG
+#define ERROR_DESTINATION_ELEMENT_FULL	EXFULL
+#define ERROR_ALREADY_INITIALIZED		EALREADY
 
 #define EXIT_CODE_OK					EX_OK
 #define EXIT_CODE_CONFIG				EX_CONFIG

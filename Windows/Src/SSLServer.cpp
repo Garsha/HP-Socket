@@ -23,7 +23,6 @@
  
 #include "stdafx.h"
 #include "SSLServer.h"
-#include "SSLHelper.h"
 
 #ifdef _SSL_SUPPORT
 
@@ -54,12 +53,13 @@ void CSSLServer::PrepareStart()
 
 void CSSLServer::Reset()
 {
+	m_sslPool.Clear();
 	m_sslCtx.RemoveThreadLocalState();
 
 	__super::Reset();
 }
 
-void CSSLServer::OnWorkerThreadEnd(DWORD dwThreadID)
+void CSSLServer::OnWorkerThreadEnd(THR_ID dwThreadID)
 {
 	m_sslCtx.RemoveThreadLocalState();
 
@@ -81,19 +81,18 @@ BOOL CSSLServer::SendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCoun
 	CSSLSession* pSession = nullptr;
 	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
 
-	return ::ProcessSend(this, pSocketObj, pSession, pBuffers, iCount);
+	if(pSession != nullptr)
+		return ::ProcessSend(this, pSocketObj, pSession, pBuffers, iCount);
+	else
+		return DoSendPackets(pSocketObj, pBuffers, iCount);
 }
 
 EnHandleResult CSSLServer::FireAccept(TSocketObj* pSocketObj)
 {
 	EnHandleResult result = DoFireAccept(pSocketObj);
 
-	if(result != HR_ERROR)
-	{
-		CSSLSession* pSession = m_sslPool.PickFreeSession();
-		VERIFY(SetConnectionReserved2(pSocketObj, pSession));
-		VERIFY(::ProcessHandShake(this, pSocketObj, pSession) == HR_OK);
-	}
+	if(result != HR_ERROR && m_bSSLAutoHandShake)
+		DoSSLHandShake(pSocketObj);
 
 	return result;
 }
@@ -102,9 +101,11 @@ EnHandleResult CSSLServer::FireReceive(TSocketObj* pSocketObj, const BYTE* pData
 {
 	CSSLSession* pSession = nullptr;
 	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
-	ASSERT(pSession);
 
-	return ::ProcessReceive(this, pSocketObj, pSession, pData, iLength);
+	if(pSession != nullptr)
+		return ::ProcessReceive(this, pSocketObj, pSession, pData, iLength);
+	else
+		return DoFireReceive(pSocketObj, pData, iLength);
 }
 
 EnHandleResult CSSLServer::FireClose(TSocketObj* pSocketObj, EnSocketOperation enOperation, int iErrorCode)
@@ -113,7 +114,6 @@ EnHandleResult CSSLServer::FireClose(TSocketObj* pSocketObj, EnSocketOperation e
 
 	CSSLSession* pSession = nullptr;
 	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
-	ASSERT(pSession);
 
 	if(pSession != nullptr)
 		m_sslPool.PutFreeSession(pSession);
@@ -121,13 +121,92 @@ EnHandleResult CSSLServer::FireClose(TSocketObj* pSocketObj, EnSocketOperation e
 	return result;
 }
 
-EnHandleResult CSSLServer::FireShutdown()
+BOOL CSSLServer::StartSSLHandShake(CONNID dwConnID)
 {
-	EnHandleResult result = DoFireShutdown();
+	if(IsSSLAutoHandShake())
+	{
+		::SetLastError(ERROR_INVALID_OPERATION);
+		return FALSE;
+	}
 
-	m_sslPool.Clear();
+	TSocketObj* pSocketObj = FindSocketObj(dwConnID);
 
-	return result;
+	if(!TSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	return StartSSLHandShake(pSocketObj);
+}
+
+BOOL CSSLServer::StartSSLHandShake(TSocketObj* pSocketObj)
+{
+	if(!pSocketObj->HasConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CCriSecLock locallock(pSocketObj->csSend);
+
+	if(!TSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	if(!pSocketObj->HasConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CSSLSession* pSession = nullptr;
+	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
+
+	if(pSession != nullptr)
+	{
+		::SetLastError(ERROR_ALREADY_INITIALIZED);
+		return FALSE;
+	}
+
+	DoSSLHandShake(pSocketObj);
+
+	return TRUE;
+}
+
+void CSSLServer::DoSSLHandShake(TSocketObj* pSocketObj)
+{
+	CSSLSession* pSession = m_sslPool.PickFreeSession();
+
+	ENSURE(SetConnectionReserved2(pSocketObj, pSession));
+	ENSURE(::ProcessHandShake(this, pSocketObj, pSession) == HR_OK);
+}
+
+BOOL CSSLServer::GetSSLSessionInfo(CONNID dwConnID, EnSSLSessionInfo enInfo, LPVOID* lppInfo)
+{
+	ASSERT(lppInfo != nullptr);
+
+	*lppInfo				= nullptr;
+	TSocketObj* pSocketObj	= FindSocketObj(dwConnID);
+
+	if(!TSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	CSSLSession* pSession = nullptr;
+	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
+
+	if(pSession == nullptr || !pSession->IsValid())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	return pSession->GetSessionInfo(enInfo, lppInfo);
 }
 
 #endif

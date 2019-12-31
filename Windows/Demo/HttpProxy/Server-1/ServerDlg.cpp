@@ -50,7 +50,7 @@
 #define HEAD_CONN		"Connection:"
 #define HEAD_PROXY_CONN	"Proxy-Connection:"
 #define HEAD_PROXY_AUTH	"Prxoy-Authenticate:"
-#define HTTPS_RESP		"HTTP/1.1 200 Connection Established"
+#define HTTPS_RESP		"HTTP/1.1 200 Connection Established\r\nContent-Length: 0"
 #define IE_OPT_DIALOG	"rundll32.exe shell32.dll, Control_RunDLL inetcpl.cpl, , 4"
 
 static int HTTP_SCHEME_LEN		= (int)strlen(HTTP_SCHEME);

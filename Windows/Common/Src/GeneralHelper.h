@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ _WINSOCK_SUPPORT	: 支持 Windows Socket
 _DETECT_MEMORY_LEAK	: DEBUG 状态下支持内存泄露检查
 _ONLY_DETECT_CONFIRMED_MEMORY_LEAK_	: 只报告能够确认的内存泄露（不能确定的不报告）
 ---------------------------
+VC 2019
+	_MSC_VER == 1920
 VC 2017
 	_MSC_VER == 1910
 VC 2015
@@ -116,8 +118,12 @@ _WIN32_WINNT_WIN10		0x0A00
 		#define _ATL_SECURE_NO_WARNINGS			1
 	#endif
 
-	#ifndef _CRT_NON_CONFORMING_SWPRINTFS
-		#define _CRT_NON_CONFORMING_SWPRINTFS	1
+	#ifndef _ATL_SECURE_NO_WARNINGS
+		#define _ATL_SECURE_NO_WARNINGS			1
+	#endif
+
+	#ifndef _ATL_DISABLE_NOTHROW_NEW
+		#define _ATL_DISABLE_NOTHROW_NEW		1
 	#endif
 
 	#ifndef _SECURE_ATL
@@ -134,7 +140,11 @@ _WIN32_WINNT_WIN10		0x0A00
 	#if defined (_WIN64)
 		#define _WIN32_WINNT	_WIN32_WINNT_WIN7
 	#else
-		#define _WIN32_WINNT	_WIN32_WINNT_WINXP
+		#if _MSC_VER >= 1910
+			#define _WIN32_WINNT	_WIN32_WINNT_WIN7
+		#else
+			#define _WIN32_WINNT	_WIN32_WINNT_WINXP
+		#endif
 	#endif
 #endif
 
@@ -196,6 +206,9 @@ _WIN32_WINNT_WIN10		0x0A00
 	#endif
 	#ifndef VERIFY
 		#define VERIFY(f)	ATLVERIFY(f)
+	#endif
+	#ifndef ENSURE
+		#define ENSURE(f)	ATLENSURE(f)
 	#endif
 
 	#ifndef TRACE

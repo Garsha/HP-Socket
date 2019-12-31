@@ -27,19 +27,72 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\ArqHelper.cpp" />
     <ClCompile Include="..\..\src\common\BufferPool.cpp" />
     <ClCompile Include="..\..\src\common\crypto\Crypto.cpp" />
     <ClCompile Include="..\..\src\common\Event.cpp" />
     <ClCompile Include="..\..\src\common\FileHelper.cpp" />
     <ClCompile Include="..\..\src\common\FuncHelper.cpp" />
-    <ClCompile Include="..\..\src\common\http\http_parser.cpp" />
+    <ClCompile Include="..\..\src\common\http\http_parser.c">
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ThreadSafeStatics>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </RuntimeTypeInfo>
+    </ClCompile>
     <ClCompile Include="..\..\src\common\IODispatcher.cpp" />
+    <ClCompile Include="..\..\src\common\kcp\ikcp.c">
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ThreadSafeStatics>
+      <ThreadSafeStatics Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ThreadSafeStatics>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </RuntimeTypeInfo>
+      <RuntimeTypeInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </RuntimeTypeInfo>
+    </ClCompile>
     <ClCompile Include="..\..\src\common\PollHelper.cpp" />
     <ClCompile Include="..\..\src\common\RWLock.cpp" />
     <ClCompile Include="..\..\src\common\SysHelper.cpp" />
     <ClCompile Include="..\..\src\common\Thread.cpp" />
     <ClCompile Include="..\..\src\HPSocket4C-SSL.cpp" />
     <ClCompile Include="..\..\src\HPSocket4C.cpp" />
+    <ClCompile Include="..\..\src\HPThreadPool.cpp" />
     <ClCompile Include="..\..\src\HttpAgent.cpp" />
     <ClCompile Include="..\..\src\HttpClient.cpp" />
     <ClCompile Include="..\..\src\HttpCookie.cpp" />
@@ -60,11 +113,14 @@
     <ClCompile Include="..\..\src\TcpPullClient.cpp" />
     <ClCompile Include="..\..\src\TcpPullServer.cpp" />
     <ClCompile Include="..\..\src\TcpServer.cpp" />
+    <ClCompile Include="..\..\src\UdpArqClient.cpp" />
+    <ClCompile Include="..\..\src\UdpArqServer.cpp" />
     <ClCompile Include="..\..\src\UdpCast.cpp" />
     <ClCompile Include="..\..\src\UdpClient.cpp" />
     <ClCompile Include="..\..\src\UdpServer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\ArqHelper.h" />
     <ClInclude Include="..\..\src\common\BufferPool.h" />
     <ClInclude Include="..\..\src\common\BufferPtr.h" />
     <ClInclude Include="..\..\src\common\CriSec.h" />
@@ -77,6 +133,7 @@
     <ClInclude Include="..\..\src\common\GlobalErrno.h" />
     <ClInclude Include="..\..\src\common\http\http_parser.h" />
     <ClInclude Include="..\..\src\common\IODispatcher.h" />
+    <ClInclude Include="..\..\src\common\kcp\ikcp.h" />
     <ClInclude Include="..\..\src\common\PollHelper.h" />
     <ClInclude Include="..\..\src\common\PrivateHeap.h" />
     <ClInclude Include="..\..\src\common\RingBuffer.h" />
@@ -90,6 +147,7 @@
     <ClInclude Include="..\..\src\common\Thread.h" />
     <ClInclude Include="..\..\src\HPSocket4C-SSL.h" />
     <ClInclude Include="..\..\src\HPSocket4C.h" />
+    <ClInclude Include="..\..\src\HPThreadPool.h" />
     <ClInclude Include="..\..\src\HPTypeDef.h" />
     <ClInclude Include="..\..\src\HttpAgent.h" />
     <ClInclude Include="..\..\src\HttpClient.h" />
@@ -113,6 +171,8 @@
     <ClInclude Include="..\..\src\TcpPullClient.h" />
     <ClInclude Include="..\..\src\TcpPullServer.h" />
     <ClInclude Include="..\..\src\TcpServer.h" />
+    <ClInclude Include="..\..\src\UdpArqClient.h" />
+    <ClInclude Include="..\..\src\UdpArqServer.h" />
     <ClInclude Include="..\..\src\UdpCast.h" />
     <ClInclude Include="..\..\src\UdpClient.h" />
     <ClInclude Include="..\..\src\UdpServer.h" />
@@ -188,6 +248,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <OutDir>../../lib/$(ProjectName)/$(Platform)/</OutDir>
@@ -197,6 +258,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>../../lib/$(ProjectName)/$(Platform)/</OutDir>
@@ -206,6 +268,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>../../lib/$(ProjectName)/$(Platform)/</OutDir>
@@ -215,6 +278,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
     <OutDir>../../lib/$(ProjectName)/$(Platform)/</OutDir>
@@ -224,6 +288,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
     <OutDir>../../lib/$(ProjectName)/$(Platform)/</OutDir>
@@ -233,6 +298,7 @@
     <LocalRemoteCopySources>false</LocalRemoteCopySources>
     <RemoteLinkLocalCopyOutput>false</RemoteLinkLocalCopyOutput>
     <ExtensionsToDeleteOnClean>*.o;*.d;*.tlog;$(ExtensionsToDeleteOnClean)</ExtensionsToDeleteOnClean>
+    <RemoteProjectDir>$(RemoteRootDir)/$(SolutionName)</RemoteProjectDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
@@ -243,13 +309,13 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>
       </PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
       <AdditionalOptions>-Wl,-Bsymbolic -Wl,-soname,$(TargetFileName).$(VER_MAJOR) -L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -271,7 +337,7 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
@@ -286,7 +352,7 @@
       </Command>
     </RemotePreLinkEvent>
     <RemotePostBuildEvent>
-      <Command>$(RemoteRootDir)/../script/post-link.sh 3 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
+      <Command>$(RemoteRootDir)/../script/post-link.sh 7 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
     </RemotePostBuildEvent>
     <CustomBuildStep />
   </ItemDefinitionGroup>
@@ -299,13 +365,13 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>
       </PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
       <AdditionalOptions>-Wl,-Bsymbolic -Wl,-soname,$(TargetFileName).$(VER_MAJOR) -L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -327,7 +393,7 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
@@ -342,7 +408,7 @@
       </Command>
     </RemotePreLinkEvent>
     <RemotePostBuildEvent>
-      <Command>$(RemoteRootDir)/../script/post-link.sh 3 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
+      <Command>$(RemoteRootDir)/../script/post-link.sh 7 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
     </RemotePostBuildEvent>
     <CustomBuildStep />
   </ItemDefinitionGroup>
@@ -355,13 +421,13 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>
       </PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <LibraryDependencies>jemalloc_pic;ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
+      <LibraryDependencies>ssl;crypto;z;rt;dl;pthread</LibraryDependencies>
       <AdditionalOptions>-Wl,-Bsymbolic -Wl,-soname,$(TargetFileName).$(VER_MAJOR) -L"$(RemoteRootDir)/../dependent/$(Platform)/lib" %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(RemoteRootDir)/../dependent/$(Platform)/lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -383,7 +449,7 @@
     <ClCompile>
       <SymbolsHiddenByDefault>true</SymbolsHiddenByDefault>
       <CppLanguageStandard>c++1y</CppLanguageStandard>
-      <CppAdditionalWarning>no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
+      <CppAdditionalWarning>no-class-memaccess;no-reorder;switch;no-deprecated-declarations;empty-body;conversion;return-type;parentheses;no-format;uninitialized;unreachable-code;unused-function;unused-value;unused-variable;%(CppAdditionalWarning)</CppAdditionalWarning>
       <AdditionalIncludeDirectories>../../dependent/$(Platform)/include;$(StlIncludeDirectories);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
@@ -398,7 +464,7 @@
       </Command>
     </RemotePreLinkEvent>
     <RemotePostBuildEvent>
-      <Command>$(RemoteRootDir)/../script/post-link.sh 3 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
+      <Command>$(RemoteRootDir)/../script/post-link.sh 7 "$(RemoteProjectDir)/$(OutDir)" $(TargetName) $(Platform) $(Configuration) $(VER_MAJOR) $(VER_MINOR) $(VER_REVISE)</Command>
     </RemotePostBuildEvent>
     <CustomBuildStep />
   </ItemDefinitionGroup>

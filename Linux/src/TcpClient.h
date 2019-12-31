@@ -29,7 +29,7 @@
 class CTcpClient : public ITcpClient
 {
 public:
-	virtual BOOL Start	(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect = TRUE, LPCTSTR lpszBindAddress = nullptr);
+	virtual BOOL Start	(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect = TRUE, LPCTSTR lpszBindAddress = nullptr, USHORT usLocalPort = 0);
 	virtual BOOL Stop	();
 	virtual BOOL Send	(const BYTE* pBuffer, int iLength, int iOffset = 0);
 	virtual BOOL SendSmallFile	(LPCTSTR lpszFileName, const LPWSABUF pHead = nullptr, const LPWSABUF pTail = nullptr);
@@ -45,10 +45,20 @@ public:
 	virtual BOOL GetRemoteHost			(TCHAR lpszHost[], int& iHostLen, USHORT& usPort);
 	virtual BOOL GetPendingDataLength	(int& iPending) {iPending = m_lsSend.Length(); return HasStarted();}
 	virtual BOOL IsPauseReceive			(BOOL& bPaused) {bPaused = m_bPaused; return HasStarted();}
+	virtual BOOL IsConnected			()				{return m_bConnected;}
 
 #ifdef _SSL_SUPPORT
-	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPasswod = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)	{return FALSE;}
-	virtual void CleanupSSLContext	()																																													{}
+	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPassword = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)	{return FALSE;}
+	virtual BOOL SetupSSLContextByMemory(int iVerifyMode = SSL_VM_NONE, LPCSTR lpszPemCert = nullptr, LPCSTR lpszPemKey = nullptr, LPCSTR lpszKeyPassword = nullptr, LPCSTR lpszCAPemCert = nullptr)						{return FALSE;}
+	virtual void CleanupSSLContext	()						{}
+
+	virtual BOOL StartSSLHandShake	()						{return FALSE;}
+	virtual void SetSSLAutoHandShake(BOOL bAutoHandShake)	{}
+	virtual BOOL IsSSLAutoHandShake	()						{return FALSE;}
+	virtual BOOL GetSSLSessionInfo(EnSSLSessionInfo enInfo, LPVOID* lppInfo)	{return FALSE;}
+
+protected:
+	virtual BOOL StartSSLHandShakeNoCheck()					{return FALSE;}
 #endif
 
 public:
@@ -108,6 +118,9 @@ protected:
 	virtual void PrepareStart();
 	virtual void Reset();
 
+	virtual BOOL BeforeUnpause() {return TRUE;}
+
+	virtual void OnWorkerThreadStart(THR_ID tid) {}
 	virtual void OnWorkerThreadEnd(THR_ID tid) {}
 
 	BOOL DoSendPackets(const WSABUF pBuffers[], int iCount);
@@ -116,17 +129,19 @@ protected:
 		{return pClient->DoSendPackets(pBuffers, iCount);}
 
 protected:
+	BOOL IsPaused		()					{return m_bPaused;}
 	void SetReserved	(PVOID pReserved)	{m_pReserved = pReserved;}						
 	PVOID GetReserved	()					{return m_pReserved;}
 	BOOL GetRemoteHost	(LPCSTR* lpszHost, USHORT* pusPort = nullptr);
 
 private:
 	void SetRemoteHost	(LPCTSTR lpszHost, USHORT usPort);
+	void SetConnected	(BOOL bConnected = TRUE) {m_bConnected = bConnected; if(bConnected) m_enState = SS_STARTED;}
 
 	BOOL CheckStarting();
 	BOOL CheckStoping();
 	BOOL CreateClientSocket(LPCTSTR lpszRemoteAddress, HP_SOCKADDR& addrRemote, USHORT usPort, LPCTSTR lpszBindAddress, HP_SOCKADDR& addrBind);
-	BOOL BindClientSocket(const HP_SOCKADDR& addrBind);
+	BOOL BindClientSocket(const HP_SOCKADDR& addrBind, const HP_SOCKADDR& addrRemote, USHORT usLocalPort);
 	BOOL ConnectToServer(const HP_SOCKADDR& addrRemote, BOOL bAsyncConnect);
 	BOOL CreateWorkerThread();
 	BOOL ProcessNetworkEvent(SHORT events);
@@ -140,9 +155,6 @@ private:
 	BOOL HandleClose	(SHORT events);
 	BOOL HandleRead		(SHORT events);
 	BOOL HandleWrite	(SHORT events);
-
-	void SetConnected	() {m_bConnected = TRUE; m_enState = SS_STARTED;}
-	BOOL HasConnected	() {return m_bConnected;}
 
 	UINT WINAPI WorkerThreadProc(LPVOID pv);
 
@@ -171,7 +183,7 @@ public:
 
 	virtual ~CTcpClient()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:

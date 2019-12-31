@@ -71,26 +71,10 @@ Release:
 /**************************************************/
 /************** HPSocket 对象智能指针 **************/
 
-template<class T, class _Listener, class _Creator> class CHPSocketPtr
+template<class T, class _Creator> class CHPBasePtr
 {
 public:
-	CHPSocketPtr(_Listener* pListener)
-	{
-		m_pObj = _Creator::Create(pListener);
-	}
-
-	CHPSocketPtr() : m_pObj(nullptr)
-	{
-
-	}
-
-	~CHPSocketPtr()
-	{
-		Reset();
-	}
-
-public:
-	CHPSocketPtr& Reset(T* pObj = nullptr)
+	CHPBasePtr& Reset(T* pObj = nullptr)
 	{
 		if(pObj != m_pObj)
 		{
@@ -103,7 +87,7 @@ public:
 		return *this;
 	}
 
-	CHPSocketPtr& Attach(T* pObj)
+	CHPBasePtr& Attach(T* pObj)
 	{
 		return Reset(pObj);
 	}
@@ -121,14 +105,51 @@ public:
 	T* operator ->	()	const	{return m_pObj				;}
 	operator T*		()	const	{return m_pObj				;}
 
-	CHPSocketPtr& operator = (T* pObj)	{return Reset(pObj)	;}
+	CHPBasePtr& operator = (T* pObj)	{return Reset(pObj)	;}
+
+public:
+	CHPBasePtr() : m_pObj(nullptr)
+	{
+
+	}
+
+	virtual ~CHPBasePtr()
+	{
+		Reset();
+	}
 
 private:
-	CHPSocketPtr(const CHPSocketPtr&);
-	CHPSocketPtr& operator = (const CHPSocketPtr&);
+	CHPBasePtr(const CHPBasePtr&);
+	CHPBasePtr& operator = (const CHPBasePtr&);
 
-private:
+protected:
 	T* m_pObj;
+};
+
+template<class T, class _Listener, class _Creator> class CHPSocketPtr : public CHPBasePtr<T, _Creator>
+{
+public:
+	CHPSocketPtr(_Listener* pListener)
+	{
+		__super::m_pObj = _Creator::Create(pListener);
+	}
+
+	CHPSocketPtr()
+	{
+
+	}
+
+};
+
+template<class T, class _Creator> class CHPObjectPtr : public CHPBasePtr<T, _Creator>
+{
+public:
+	CHPObjectPtr(BOOL bCreate = FALSE)
+	{
+		if(bCreate)
+			__super::m_pObj = _Creator::Create();
+	}
+
 };
 
 /**************************************************/
@@ -152,12 +173,6 @@ HPSOCKET_API ITcpPackServer* HP_Create_TcpPackServer(ITcpServerListener* pListen
 HPSOCKET_API ITcpPackAgent* HP_Create_TcpPackAgent(ITcpAgentListener* pListener);
 // 创建 ITcpPackClient 对象
 HPSOCKET_API ITcpPackClient* HP_Create_TcpPackClient(ITcpClientListener* pListener);
-// 创建 IUdpServer 对象
-HPSOCKET_API IUdpServer* HP_Create_UdpServer(IUdpServerListener* pListener);
-// 创建 IUdpClient 对象
-HPSOCKET_API IUdpClient* HP_Create_UdpClient(IUdpClientListener* pListener);
-// 创建 IUdpCast 对象
-HPSOCKET_API IUdpCast* HP_Create_UdpCast(IUdpCastListener* pListener);
 
 // 销毁 ITcpServer 对象
 HPSOCKET_API void HP_Destroy_TcpServer(ITcpServer* pServer);
@@ -177,12 +192,32 @@ HPSOCKET_API void HP_Destroy_TcpPackServer(ITcpPackServer* pServer);
 HPSOCKET_API void HP_Destroy_TcpPackAgent(ITcpPackAgent* pAgent);
 // 销毁 ITcpPackClient 对象
 HPSOCKET_API void HP_Destroy_TcpPackClient(ITcpPackClient* pClient);
+
+#ifdef _UDP_SUPPORT
+
+// 创建 IUdpServer 对象
+HPSOCKET_API IUdpServer* HP_Create_UdpServer(IUdpServerListener* pListener);
+// 创建 IUdpClient 对象
+HPSOCKET_API IUdpClient* HP_Create_UdpClient(IUdpClientListener* pListener);
+// 创建 IUdpCast 对象
+HPSOCKET_API IUdpCast* HP_Create_UdpCast(IUdpCastListener* pListener);
+// 创建 IUdpArqServer 对象
+HPSOCKET_API IUdpArqServer* HP_Create_UdpArqServer(IUdpServerListener* pListener);
+// 创建 IUdpArqClient 对象
+HPSOCKET_API IUdpArqClient* HP_Create_UdpArqClient(IUdpClientListener* pListener);
+
 // 销毁 IUdpServer 对象
 HPSOCKET_API void HP_Destroy_UdpServer(IUdpServer* pServer);
 // 销毁 IUdpClient 对象
 HPSOCKET_API void HP_Destroy_UdpClient(IUdpClient* pClient);
 // 销毁 IUdpCast 对象
 HPSOCKET_API void HP_Destroy_UdpCast(IUdpCast* pCast);
+// 销毁 IUdpArqServer 对象
+HPSOCKET_API void HP_Destroy_UdpArqServer(IUdpArqServer* pServer);
+// 销毁 IUdpArqClient 对象
+HPSOCKET_API void HP_Destroy_UdpArqClient(IUdpArqClient* pClient);
+
+#endif
 
 // ITcpServer 对象创建器
 struct TcpServer_Creator
@@ -310,6 +345,27 @@ struct TcpPackClient_Creator
 	}
 };
 
+// ITcpServer 对象智能指针
+typedef CHPSocketPtr<ITcpServer, ITcpServerListener, TcpServer_Creator>			CTcpServerPtr;
+// ITcpAgent 对象智能指针
+typedef CHPSocketPtr<ITcpAgent, ITcpAgentListener, TcpAgent_Creator>			CTcpAgentPtr;
+// ITcpClient 对象智能指针
+typedef CHPSocketPtr<ITcpClient, ITcpClientListener, TcpClient_Creator>			CTcpClientPtr;
+// ITcpPullServer 对象智能指针
+typedef CHPSocketPtr<ITcpPullServer, ITcpServerListener, TcpPullServer_Creator>	CTcpPullServerPtr;
+// ITcpPullAgent 对象智能指针
+typedef CHPSocketPtr<ITcpPullAgent, ITcpAgentListener, TcpPullAgent_Creator>	CTcpPullAgentPtr;
+// ITcpPullClient 对象智能指针
+typedef CHPSocketPtr<ITcpPullClient, ITcpClientListener, TcpPullClient_Creator>	CTcpPullClientPtr;
+// ITcpPackServer 对象智能指针
+typedef CHPSocketPtr<ITcpPackServer, ITcpServerListener, TcpPackServer_Creator>	CTcpPackServerPtr;
+// ITcpPackAgent 对象智能指针
+typedef CHPSocketPtr<ITcpPackAgent, ITcpAgentListener, TcpPackAgent_Creator>	CTcpPackAgentPtr;
+// ITcpPackClient 对象智能指针
+typedef CHPSocketPtr<ITcpPackClient, ITcpClientListener, TcpPackClient_Creator>	CTcpPackClientPtr;
+
+#ifdef _UDP_SUPPORT
+
 // IUdpServer 对象创建器
 struct UdpServer_Creator
 {
@@ -338,7 +394,7 @@ struct UdpClient_Creator
 	}
 };
 
-// IUdpClient 对象创建器
+// IUdpCast 对象创建器
 struct UdpCast_Creator
 {
 	static IUdpCast* Create(IUdpCastListener* pListener)
@@ -352,30 +408,46 @@ struct UdpCast_Creator
 	}
 };
 
-// ITcpServer 对象智能指针
-typedef CHPSocketPtr<ITcpServer, ITcpServerListener, TcpServer_Creator>			CTcpServerPtr;
-// ITcpAgent 对象智能指针
-typedef CHPSocketPtr<ITcpAgent, ITcpAgentListener, TcpAgent_Creator>			CTcpAgentPtr;
-// ITcpClient 对象智能指针
-typedef CHPSocketPtr<ITcpClient, ITcpClientListener, TcpClient_Creator>			CTcpClientPtr;
-// ITcpPullServer 对象智能指针
-typedef CHPSocketPtr<ITcpPullServer, ITcpServerListener, TcpPullServer_Creator>	CTcpPullServerPtr;
-// ITcpPullAgent 对象智能指针
-typedef CHPSocketPtr<ITcpPullAgent, ITcpAgentListener, TcpPullAgent_Creator>	CTcpPullAgentPtr;
-// ITcpPullClient 对象智能指针
-typedef CHPSocketPtr<ITcpPullClient, ITcpClientListener, TcpPullClient_Creator>	CTcpPullClientPtr;
-// ITcpPackServer 对象智能指针
-typedef CHPSocketPtr<ITcpPackServer, ITcpServerListener, TcpPackServer_Creator>	CTcpPackServerPtr;
-// ITcpPackAgent 对象智能指针
-typedef CHPSocketPtr<ITcpPackAgent, ITcpAgentListener, TcpPackAgent_Creator>	CTcpPackAgentPtr;
-// ITcpPackClient 对象智能指针
-typedef CHPSocketPtr<ITcpPackClient, ITcpClientListener, TcpPackClient_Creator>	CTcpPackClientPtr;
+// IUdpArqServer 对象创建器
+struct UdpArqServer_Creator
+{
+	static IUdpArqServer* Create(IUdpServerListener* pListener)
+	{
+		return HP_Create_UdpArqServer(pListener);
+	}
+
+	static void Destroy(IUdpArqServer* pServer)
+	{
+		HP_Destroy_UdpArqServer(pServer);
+	}
+};
+
+// IUdpArqClient 对象创建器
+struct UdpArqClient_Creator
+{
+	static IUdpArqClient* Create(IUdpClientListener* pListener)
+	{
+		return HP_Create_UdpArqClient(pListener);
+	}
+
+	static void Destroy(IUdpArqClient* pClient)
+	{
+		HP_Destroy_UdpArqClient(pClient);
+	}
+};
+
 // IUdpServer 对象智能指针
 typedef CHPSocketPtr<IUdpServer, IUdpServerListener, UdpServer_Creator>			CUdpServerPtr;
 // IUdpClient 对象智能指针
 typedef CHPSocketPtr<IUdpClient, IUdpClientListener, UdpClient_Creator>			CUdpClientPtr;
 // IUdpCast 对象智能指针
 typedef CHPSocketPtr<IUdpCast, IUdpCastListener, UdpCast_Creator>				CUdpCastPtr;
+// IUdpArqServer 对象智能指针
+typedef CHPSocketPtr<IUdpArqServer, IUdpServerListener, UdpArqServer_Creator>	CUdpArqServerPtr;
+// IUdpArqClient 对象智能指针
+typedef CHPSocketPtr<IUdpArqClient, IUdpClientListener, UdpArqClient_Creator>	CUdpArqClientPtr;
+
+#endif
 
 /*****************************************************************************************************************************************************/
 /*************************************************************** Global Function Exports *************************************************************/
@@ -411,6 +483,8 @@ HPSOCKET_API int SYS_SSO_RecvBuffSize(SOCKET sock, int size);
 HPSOCKET_API int SYS_SSO_SendBuffSize(SOCKET sock, int size);
 // 设置 socket 选项：SOL_SOCKET -> SO_REUSEADDR
 HPSOCKET_API int SYS_SSO_ReuseAddress(SOCKET sock, BOOL bReuse);
+// 设置 socket 选项：SOL_SOCKET -> SO_EXCLUSIVEADDRUSE
+HPSOCKET_API int SYS_SSO_ExclusiveAddressUse(SOCKET sock, BOOL bExclusive);
 
 // 获取 SOCKET 本地地址信息
 HPSOCKET_API BOOL SYS_GetSocketLocalAddress(SOCKET socket, TCHAR lpszAddress[], int& iAddressLen, USHORT& usPort);
@@ -430,6 +504,13 @@ HPSOCKET_API BOOL SYS_GetIPAddress(LPCTSTR lpszHost, TCHAR lpszIP[], int& iIPLen
 HPSOCKET_API ULONGLONG SYS_NToH64(ULONGLONG value);
 /* 64 位主机字节序转网络字节序 */
 HPSOCKET_API ULONGLONG SYS_HToN64(ULONGLONG value);
+
+/* 分配内存 */
+HPSOCKET_API LPBYTE SYS_Malloc(int size);
+/* 重新分配内存 */
+HPSOCKET_API LPBYTE SYS_Realloc(LPBYTE p, int size);
+/* 释放内存 */
+HPSOCKET_API VOID SYS_Free(LPBYTE p);
 
 // CP_XXX -> UNICODE
 HPSOCKET_API BOOL SYS_CodePageToUnicode(int iCodePage, const char szSrc[], WCHAR szDest[], int& iDestLength);
@@ -617,3 +698,54 @@ HPSOCKET_API int HP_HttpCookie_HLP_ExpiresToMaxAge(__time64_t tmExpires);
 /*****************************************************************************************************************************************************/
 
 #endif
+
+/*****************************************************************************************************************************************************/
+/**************************************************************** Thread Pool Exports ****************************************************************/
+/*****************************************************************************************************************************************************/
+
+// 创建 IHPThreadPool 对象
+HPSOCKET_API IHPThreadPool* HP_Create_ThreadPool();
+// 销毁 IHPThreadPool 对象
+HPSOCKET_API void HP_Destroy_ThreadPool(IHPThreadPool* pThreadPool);
+
+/*
+* 名称：创建 TSocketTask 对象
+* 描述：创建任务对象，该对象最终需由 HP_Destroy_SocketTaskObj() 销毁
+*		
+* 参数：		fnTaskProc	-- 任务处理函数
+*			pSender		-- 发起对象
+*			dwConnID	-- 连接 ID
+*			pBuffer		-- 数据缓冲区
+*			iBuffLen	-- 数据缓冲区长度
+*			enBuffType	-- 数据缓冲区类型（默认：TBT_COPY）
+*							TBT_COPY	：（深拷贝）pBuffer 复制到 TSocketTask 对象。此后 TSocketTask 对象与 pBuffer 不再有任何关联
+*											-> 适用于 pBuffer 不大或 pBuffer 生命周期不受控的场景
+*							TBT_REFER	：（浅拷贝）pBuffer 不复制到 TSocketTask 对象，需确保 TSocketTask 对象生命周期内 pBuffer 必须有效
+*											-> 适用于 pBuffer 较大或 pBuffer 可重用，并且 pBuffer 生命周期受控的场景
+*							TBT_ATTACH	：（附属）执行浅拷贝，但 TSocketTask 对象会获得 pBuffer 的所有权，并负责释放 pBuffer，避免多次缓冲区拷贝
+*											-> 注意：pBuffer 必须由 SYS_Malloc() 函数分配才能使用本类型，否则可能会发生内存访问错误
+*			wParam		-- 自定义参数
+*			lParam		-- 自定义参数
+* 返回值：	LPTSocketTask
+*/
+HPSOCKET_API LPTSocketTask HP_Create_SocketTaskObj(Fn_SocketTaskProc fnTaskProc, PVOID pSender, CONNID dwConnID, LPCBYTE pBuffer, INT iBuffLen, EnTaskBufferType enBuffType = TBT_COPY, WPARAM wParam = 0, LPARAM lParam = 0);
+
+// 销毁 TSocketTask 对象
+HPSOCKET_API void HP_Destroy_SocketTaskObj(LPTSocketTask pTask);
+
+// IHPThreadPool 对象创建器
+struct HPThreadPool_Creator
+{
+	static IHPThreadPool* Create()
+	{
+		return HP_Create_ThreadPool();
+	}
+
+	static void Destroy(IHPThreadPool* pThreadPool)
+	{
+		HP_Destroy_ThreadPool(pThreadPool);
+	}
+};
+
+// IHPThreadPool 对象智能指针
+typedef CHPObjectPtr<IHPThreadPool, HPThreadPool_Creator>	CHPThreadPoolPtr;

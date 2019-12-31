@@ -50,7 +50,7 @@ protected:
 		if(result != HR_ERROR)
 		{
 			TBuffer* pBuffer = m_bfPool.PickFreeBuffer(pSocketObj->connID);
-			VERIFY(SetConnectionReserved(pSocketObj, TBufferPackInfo::Construct(pBuffer)));
+			ENSURE(SetConnectionReserved(pSocketObj, TBufferPackInfo::Construct(pBuffer)));
 		}
 
 		return result;
@@ -93,6 +93,26 @@ protected:
 		return result;
 	}
 
+	virtual EnHandleResult BeforeUnpause(TSocketObj* pSocketObj)
+	{
+		CCriSecLock locallock(pSocketObj->csRecv);
+
+		if(!TSocketObj::IsValid(pSocketObj))
+			return (EnHandleResult)HR_CLOSED;
+
+		if(pSocketObj->IsPaused())
+			return HR_IGNORE;
+
+		TBufferPackInfo* pInfo = nullptr;
+		GetConnectionReserved(pSocketObj, (PVOID*)&pInfo);
+		ASSERT(pInfo);
+
+		TBuffer* pBuffer = (TBuffer*)pInfo->pBuffer;
+		ASSERT(pBuffer && pBuffer->IsValid());
+
+		return ParsePack(this, pInfo, pBuffer, pSocketObj, m_dwMaxPackSize, m_usHeaderFlag);
+	}
+
 	virtual BOOL CheckParams()
 	{
 		if	((m_dwMaxPackSize > 0 && m_dwMaxPackSize <= TCP_PACK_MAX_SIZE_LIMIT)	&&
@@ -129,7 +149,7 @@ private:
 		{return __super::DoFireReceive(pSocketObj, pData, iLength);}
 
 	friend EnHandleResult ParsePack<>	(CTcpPackAgentT* pThis, TBufferPackInfo* pInfo, TBuffer* pBuffer, TSocketObj* pSocket,
-										DWORD dwMaxPackSize, USHORT usPackHeaderFlag, const BYTE* pData, int iLength);
+										DWORD dwMaxPackSize, USHORT usPackHeaderFlag);
 
 public:
 	CTcpPackAgentT(ITcpAgentListener* pListener)
@@ -142,7 +162,7 @@ public:
 
 	virtual ~CTcpPackAgentT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:

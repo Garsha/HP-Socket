@@ -2,11 +2,11 @@
 * Copyright: JessMA Open Source (ldcsaa@gmail.com)
 *
 * Author	: Bruce Liang
-* Website	: http://www.jessma.org
-* Project	: https://github.com/ldcsaa
+* Website	: https://github.com/ldcsaa
+* Project	: https://github.com/ldcsaa/HP-Socket
 * Blog		: http://www.cnblogs.com/ldcsaa
 * Wiki		: http://www.oschina.net/p/hp-socket
-* QQ Group	: 75375912, 44636872
+* QQ Group	: 44636872, 75375912
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -28,32 +28,11 @@
 #include <sched.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <sys/timerfd.h>
 
 #if !defined(__ANDROID__)
 	#include <sys/timeb.h>
 #endif
-
-#define DEFAULT_CRISEC_SPIN_COUNT	4096
-
-#if defined (__x86_64__)
-	#define DEFAULT_PAUSE_RETRY		16
-	#define DEFAULT_PAUSE_YIELD		128
-	#define DEFAULT_PAUSE_CYCLE		8192
-#else
-	#define DEFAULT_PAUSE_RETRY		4
-	#define DEFAULT_PAUSE_YIELD		32
-	#define DEFAULT_PAUSE_CYCLE		4096
-#endif
-
-INT YieldThread(UINT i)
-{
-	if(IS_INFINITE(i))						return YieldProcessor();
-	else if(i < DEFAULT_PAUSE_RETRY)		return TRUE;
-	else if(i < DEFAULT_PAUSE_YIELD)		return YieldProcessor();
-	else if(i < DEFAULT_PAUSE_CYCLE - 1)	return YieldProcessor();
-	else if(i < DEFAULT_PAUSE_CYCLE)		return YieldProcessor();
-	else									return YieldThread(i & (DEFAULT_PAUSE_CYCLE - 1));
-}
 
 INT WaitFor(DWORD dwMillSecond, DWORD dwSecond, BOOL bExceptThreadInterrupted)
 {
@@ -130,14 +109,20 @@ ULLONG TimeGetTime64()
 	return 0ull;
 }
 
-DWORD GetTimeGap32(DWORD dwOriginal)
+DWORD GetTimeGap32(DWORD dwOriginal, DWORD dwCurrent)
 {
-	return TimeGetTime() - dwOriginal;
+	if(dwCurrent == 0)
+		dwCurrent = ::TimeGetTime();
+
+	return dwCurrent - dwOriginal;
 }
 
-ULLONG GetTimeGap64(ULLONG ullOriginal)
+ULLONG GetTimeGap64(ULLONG ullOriginal, ULONGLONG ullCurrent)
 {
-	return TimeGetTime64() - ullOriginal;
+	if(ullCurrent == 0)
+		ullCurrent = ::TimeGetTime64();
+
+	return ullCurrent - ullOriginal;
 }
 
 LLONG TimevalToMillisecond(const timeval& tv)
@@ -186,6 +171,51 @@ timespec& GetFutureTimespec(LLONG ms, timespec& ts, clockid_t clkid)
 	return ts;
 }
 
+FD CreateTimer(LLONG llInterval, LLONG llStart, BOOL bRealTimeClock)
+{
+	ASSERT_CHECK_EINVAL(llInterval >= 0L);
+
+	if(llStart < 0)
+		llStart = llInterval;
+
+	FD fdTimer = timerfd_create((bRealTimeClock ? CLOCK_REALTIME : CLOCK_MONOTONIC), TFD_NONBLOCK | TFD_CLOEXEC);
+
+	itimerspec its;
+
+	::MillisecondToTimespec(llStart, its.it_value);
+	::MillisecondToTimespec(llInterval, its.it_interval);
+
+	if(IS_HAS_ERROR(timerfd_settime(fdTimer, 0, &its, nullptr)))
+	{
+		close(fdTimer);
+		fdTimer = INVALID_FD;
+	}
+
+	return fdTimer;
+}
+
+BOOL ReadTimer(FD tmr, ULLONG* pVal, BOOL* pRs)
+{
+	static const SSIZE_T SIZE = sizeof(ULLONG);
+
+	if(pVal == nullptr)
+		pVal = CreateLocalObject(ULLONG);
+	if(pRs == nullptr)
+		pRs = CreateLocalObject(BOOL);
+
+	if(read(tmr, pVal, SIZE) == SIZE)
+		*pRs = TRUE;
+	else
+	{
+		*pRs = FALSE;
+
+		if(!IS_WOULDBLOCK_ERROR())
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
 BOOL fcntl_SETFL(FD fd, INT fl, BOOL bSet)
 {
 	int val = fcntl(fd, F_GETFL);
@@ -210,9 +240,9 @@ void __EXIT_FN_(void (*fn)(int), LPCSTR lpszFnName, int* lpiExitCode, int iErrno
 		lpszTitle = CreateLocalObjects(char, 50);
 
 		if(lpiExitCode)
-			sprintf((LPSTR)lpszTitle, "(#%d, %u) > %s(%d) [%d]", SELF_NATIVE_THREAD_ID, SELF_THREAD_ID, lpszFnName, *lpiExitCode, iErrno);
+			sprintf((LPSTR)lpszTitle, "(#%ld, %ld) > %s(%d) [%d]", SELF_NATIVE_THREAD_ID, SELF_THREAD_ID, lpszFnName, *lpiExitCode, iErrno);
 		else
-			sprintf((LPSTR)lpszTitle, "(#%d, %u) > %s() [%d]", SELF_NATIVE_THREAD_ID, SELF_THREAD_ID, lpszFnName, iErrno);
+			sprintf((LPSTR)lpszTitle, "(#%ld, %ld) > %s() [%d]", SELF_NATIVE_THREAD_ID, SELF_THREAD_ID, lpszFnName, iErrno);
 	}
 
 	if(lpszFile && iLine > 0)

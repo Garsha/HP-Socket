@@ -47,6 +47,7 @@ public:
 	virtual BOOL			GetLocalAddress				(CONNID dwConnID, TCHAR lpszAddress[], int& iAddressLen, USHORT& usPort);
 	virtual BOOL			GetRemoteAddress			(CONNID dwConnID, TCHAR lpszAddress[], int& iAddressLen, USHORT& usPort);
 	
+	virtual BOOL IsConnected			(CONNID dwConnID);
 	virtual BOOL IsPauseReceive			(CONNID dwConnID, BOOL& bPaused);
 	virtual BOOL GetPendingDataLength	(CONNID dwConnID, int& iPending);
 	virtual DWORD GetConnectionCount	();
@@ -57,18 +58,30 @@ public:
 	virtual LPCTSTR	GetLastErrorDesc	()	{return ::GetSocketErrorDesc(m_enLastError);}
 
 #ifdef _SSL_SUPPORT
-	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPasswod = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr, Fn_SNI_ServerNameCallback fnServerNameCallback = nullptr)	{return FALSE;}
-	virtual BOOL AddSSLContext		(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPasswod = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)															{return FALSE;}
-	virtual void CleanupSSLContext	()																																																											{}
+	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPassword = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr, Fn_SNI_ServerNameCallback fnServerNameCallback = nullptr)	{return FALSE;}
+	virtual BOOL SetupSSLContextByMemory(int iVerifyMode = SSL_VM_NONE, LPCSTR lpszPemCert = nullptr, LPCSTR lpszPemKey = nullptr, LPCSTR lpszKeyPassword = nullptr, LPCSTR lpszCAPemCert = nullptr, Fn_SNI_ServerNameCallback fnServerNameCallback = nullptr)					{return FALSE;}
+	virtual int AddSSLContext		(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPassword = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)															{return FALSE;}
+	virtual int AddSSLContextByMemory(int iVerifyMode = SSL_VM_NONE, LPCSTR lpszPemCert = nullptr, LPCSTR lpszPemKey = nullptr, LPCSTR lpszKeyPassword = nullptr, LPCSTR lpszCAPemCert = nullptr)																				{return FALSE;}
+	virtual BOOL BindSSLServerName	(LPCTSTR lpszServerName, int iContextIndex)																																																	{return FALSE;}
+	virtual void CleanupSSLContext	()						{}
+
+	virtual BOOL StartSSLHandShake	(CONNID dwConnID)		{return FALSE;}
+	virtual void SetSSLAutoHandShake(BOOL bAutoHandShake)	{}
+	virtual BOOL IsSSLAutoHandShake	()						{return FALSE;}
+	virtual BOOL GetSSLSessionInfo(CONNID dwConnID, EnSSLSessionInfo enInfo, LPVOID* lppInfo)	{return FALSE;}
+
+protected:
+	virtual BOOL StartSSLHandShake	(TSocketObj* pSocketObj){return FALSE;}
 #endif
 
 public:
-	virtual BOOL IsSecure				() {return FALSE;}
+	virtual BOOL IsSecure			() {return FALSE;}
 
 	virtual BOOL SetConnectionExtra(CONNID dwConnID, PVOID pExtra);
 	virtual BOOL GetConnectionExtra(CONNID dwConnID, PVOID* ppExtra);
 
-	virtual void SetSendPolicy				(EnSendPolicy enSendPolicy)		{m_enSendPolicy				= enSendPolicy;}
+	virtual void SetSendPolicy				(EnSendPolicy enSendPolicy)				{m_enSendPolicy			= enSendPolicy;}
+	virtual void SetOnSendSyncPolicy		(EnOnSendSyncPolicy enOnSendSyncPolicy)	{m_enOnSendSyncPolicy	= enOnSendSyncPolicy;}
 	virtual void SetMaxConnectionCount		(DWORD dwMaxConnectionCount)	{m_dwMaxConnectionCount		= dwMaxConnectionCount;}
 	virtual void SetWorkerThreadCount		(DWORD dwWorkerThreadCount)		{m_dwWorkerThreadCount		= dwWorkerThreadCount;}
 	virtual void SetSocketListenQueue		(DWORD dwSocketListenQueue)		{m_dwSocketListenQueue		= dwSocketListenQueue;}
@@ -83,7 +96,8 @@ public:
 	virtual void SetKeepAliveInterval		(DWORD dwKeepAliveInterval)		{m_dwKeepAliveInterval		= dwKeepAliveInterval;}
 	virtual void SetMarkSilence				(BOOL bMarkSilence)				{m_bMarkSilence				= bMarkSilence;}
 
-	virtual EnSendPolicy GetSendPolicy		()	{return m_enSendPolicy;}
+	virtual EnSendPolicy GetSendPolicy				()	{return m_enSendPolicy;}
+	virtual EnOnSendSyncPolicy GetOnSendSyncPolicy	()	{return m_enOnSendSyncPolicy;}
 	virtual DWORD GetMaxConnectionCount		()	{return m_dwMaxConnectionCount;}
 	virtual DWORD GetWorkerThreadCount		()	{return m_dwWorkerThreadCount;}
 	virtual DWORD GetSocketListenQueue		()	{return m_dwSocketListenQueue;}
@@ -105,7 +119,6 @@ protected:
 		{
 			EnHandleResult rs		= DoFireAccept(pSocketObj);
 			if(rs != HR_ERROR) rs	= FireHandShake(pSocketObj);
-			if(rs != HR_ERROR) pSocketObj->ResetSndBuffSize(pSocketObj->socket);
 			return rs;
 		}
 	virtual EnHandleResult FireHandShake(TSocketObj* pSocketObj)
@@ -143,7 +156,10 @@ protected:
 	virtual void PrepareStart();
 	virtual void Reset();
 
-	virtual void OnWorkerThreadEnd(DWORD dwThreadID) {}
+	virtual EnHandleResult BeforeUnpause(TSocketObj* pSocketObj) {return HR_IGNORE;}
+
+	virtual void OnWorkerThreadStart(THR_ID dwThreadID) {}
+	virtual void OnWorkerThreadEnd(THR_ID dwThreadID) {}
 
 	BOOL DoSendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCount);
 	BOOL DoSendPackets(TSocketObj* pSocketObj, const WSABUF pBuffers[], int iCount);
@@ -194,7 +210,7 @@ private:
 	BOOL		InvalidSocketObj(TSocketObj* pSocketObj);
 	void		ReleaseGCSocketObj(BOOL bForce = FALSE);
 
-	void		AddClientSocketObj(CONNID dwConnID, TSocketObj* pSocketObj);
+	void		AddClientSocketObj(CONNID dwConnID, TSocketObj* pSocketObj, const HP_SOCKADDR& remoteAddr);
 	void		CloseClientSocketObj(TSocketObj* pSocketObj, EnSocketCloseFlag enFlag = SCF_NONE, EnSocketOperation enOperation = SO_UNKNOWN, int iErrorCode = 0, int iShutdownFlag = SD_SEND);
 
 private:
@@ -212,12 +228,13 @@ private:
 	int SendInternal(TSocketObj* pSocketObj, const WSABUF pBuffers[], int iCount);
 	int SendPack	(TSocketObj* pSocketObj, const BYTE* pBuffer, int iLength);
 	int SendSafe	(TSocketObj* pSocketObj, const BYTE* pBuffer, int iLength);
-	int SendDirect	(TSocketObj* pSocketObj, const BYTE* pBuffer, int iLength);
 	int CatAndPost	(TSocketObj* pSocketObj, const BYTE* pBuffer, int iLength);
+	int SendDirect	(TSocketObj* pSocketObj, const BYTE* pBuffer, int iLength);
 
-	BOOL DoAccept		();
+	BOOL DoAccept	();
+	int DoUnpause	(CONNID dwConnID);
+	int DoReceive	(TSocketObj* pSocketObj, TBufferObj* pBufferObj);
 	BOOL ContinueReceive(TSocketObj* pSocketObj, TBufferObj* pBufferObj, EnHandleResult& hr);
-	int DoReceive		(TSocketObj* pSocketObj, TBufferObj* pBufferObj);
 
 	int DoSend		(CONNID dwConnID);
 	int DoSend		(TSocketObj* pSocketObj);
@@ -240,7 +257,8 @@ public:
 	, m_enState					(SS_STOPPED)
 	, m_usFamily				(AF_UNSPEC)
 	, m_enSendPolicy			(SP_PACK)
-	, m_dwMaxConnectionCount	(DEFAULT_MAX_CONNECTION_COUNT)
+	, m_enOnSendSyncPolicy		(OSSP_NONE)
+	, m_dwMaxConnectionCount	(DEFAULT_CONNECTION_COUNT)
 	, m_dwWorkerThreadCount		(DEFAULT_WORKER_THREAD_COUNT)
 	, m_dwSocketListenQueue		(DEFAULT_TCP_SERVER_SOCKET_LISTEN_QUEUE)
 	, m_dwAcceptSocketCount		(DEFAULT_TCP_SERVER_ACCEPT_SOCKET_COUNT)
@@ -260,11 +278,12 @@ public:
 
 	virtual ~CTcpServer()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
 	EnSendPolicy m_enSendPolicy;
+	EnOnSendSyncPolicy m_enOnSendSyncPolicy;
 	DWORD m_dwMaxConnectionCount;
 	DWORD m_dwWorkerThreadCount;
 	DWORD m_dwSocketListenQueue;

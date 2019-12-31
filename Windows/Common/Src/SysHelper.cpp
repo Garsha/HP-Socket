@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,13 +29,13 @@
 
 DWORD GetDefaultWorkerThreadCount()
 {
-	static DWORD s_dwtc = min((::SysGetNumberOfProcessors() * 2 + 2), MAX_WORKER_THREAD_COUNT);
+	static const DWORD s_dwtc = min((::SysGetNumberOfProcessors() * 2 + 2), MAX_WORKER_THREAD_COUNT);
 	return s_dwtc;
 }
 
-DWORD GetDefaultBufferSize()
+DWORD GetSysPageSize()
 {
-	static DWORD s_dtsbs = ::SysGetPageSize();
+	static const DWORD s_dtsbs = ::SysGetPageSize();
 	return s_dtsbs;
 }
 
@@ -62,26 +62,3 @@ DWORD SysGetPageSize()
 
 	return si.dwPageSize;
 }
-
-#if _MSC_VER < 1800
-
-BOOL SysGetOSVersionInfo(LPOSVERSIONINFO pInfo, BOOL bInfoEx)
-{
-	ASSERT(pInfo != nullptr);
-
-	pInfo->dwOSVersionInfoSize = bInfoEx ? sizeof(LPOSVERSIONINFOEX) : sizeof(LPOSVERSIONINFO);
-	return ::GetVersionEx(pInfo);
-}
-
-DWORD SysGetOSVersion()
-{
-	OSVERSIONINFO vi;
-	DWORD dwOSVersion = 0;
-
-	if(SysGetOSVersionInfo(&vi))
-		dwOSVersion = (vi.dwMajorVersion << 16) + vi.dwMinorVersion;
-
-	return dwOSVersion;
-}
-
-#endif

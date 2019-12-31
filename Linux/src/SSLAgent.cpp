@@ -53,12 +53,13 @@ void CSSLAgent::PrepareStart()
 
 void CSSLAgent::Reset()
 {
+	m_sslPool.Clear();
 	m_sslCtx.RemoveThreadLocalState();
 
 	__super::Reset();
 }
 
-void CSSLAgent::OnWorkerThreadEnd(DWORD dwThreadID)
+void CSSLAgent::OnWorkerThreadEnd(THR_ID dwThreadID)
 {
 	m_sslCtx.RemoveThreadLocalState();
 
@@ -80,20 +81,18 @@ BOOL CSSLAgent::SendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCount
 	CSSLSession* pSession = nullptr;
 	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
 
-	return ::ProcessSend(this, pSocketObj, pSession, pBuffers, iCount);
+	if(pSession != nullptr)
+		return ::ProcessSend(this, pSocketObj, pSession, pBuffers, iCount);
+	else
+		return DoSendPackets(pSocketObj, pBuffers, iCount);
 }
 
 EnHandleResult CSSLAgent::FireConnect(TAgentSocketObj* pSocketObj)
 {
 	EnHandleResult result = DoFireConnect(pSocketObj);
 
-	if(result != HR_ERROR)
-	{
-		CSSLSession* pSession = m_sslPool.PickFreeSession(pSocketObj->host);
-
-		VERIFY(SetConnectionReserved2(pSocketObj, pSession));
-		VERIFY(::ProcessHandShake(this, pSocketObj, pSession) == HR_OK);
-	}
+	if(result != HR_ERROR && m_bSSLAutoHandShake)
+		DoSSLHandShake(pSocketObj);
 
 	return result;
 }
@@ -102,9 +101,11 @@ EnHandleResult CSSLAgent::FireReceive(TAgentSocketObj* pSocketObj, const BYTE* p
 {
 	CSSLSession* pSession = nullptr;
 	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
-	ASSERT(pSession);
 
-	return ::ProcessReceive(this, pSocketObj, pSession, pData, iLength);
+	if(pSession != nullptr)
+		return ::ProcessReceive(this, pSocketObj, pSession, pData, iLength);
+	else
+		return DoFireReceive(pSocketObj, pData, iLength);
 }
 
 EnHandleResult CSSLAgent::FireClose(TAgentSocketObj* pSocketObj, EnSocketOperation enOperation, int iErrorCode)
@@ -120,13 +121,92 @@ EnHandleResult CSSLAgent::FireClose(TAgentSocketObj* pSocketObj, EnSocketOperati
 	return result;
 }
 
-EnHandleResult CSSLAgent::FireShutdown()
+BOOL CSSLAgent::StartSSLHandShake(CONNID dwConnID)
 {
-	EnHandleResult result = DoFireShutdown();
+	if(IsSSLAutoHandShake())
+	{
+		::SetLastError(ERROR_INVALID_OPERATION);
+		return FALSE;
+	}
 
-	m_sslPool.Clear();
+	TAgentSocketObj* pSocketObj = FindSocketObj(dwConnID);
 
-	return result;
+	if(!TAgentSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	return StartSSLHandShake(pSocketObj);
+}
+
+BOOL CSSLAgent::StartSSLHandShake(TAgentSocketObj* pSocketObj)
+{
+	if(!pSocketObj->HasConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CReentrantCriSecLock locallock(pSocketObj->csSend);
+
+	if(!TAgentSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	if(!pSocketObj->HasConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CSSLSession* pSession = nullptr;
+	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
+
+	if(pSession != nullptr)
+	{
+		::SetLastError(ERROR_ALREADY_INITIALIZED);
+		return FALSE;
+	}
+
+	DoSSLHandShake(pSocketObj);
+
+	return TRUE;
+}
+
+void CSSLAgent::DoSSLHandShake(TAgentSocketObj* pSocketObj)
+{
+	CSSLSession* pSession = m_sslPool.PickFreeSession(pSocketObj->host);
+
+	ENSURE(SetConnectionReserved2(pSocketObj, pSession));
+	ENSURE(::ProcessHandShake(this, pSocketObj, pSession) == HR_OK);
+}
+
+BOOL CSSLAgent::GetSSLSessionInfo(CONNID dwConnID, EnSSLSessionInfo enInfo, LPVOID* lppInfo)
+{
+	ASSERT(lppInfo != nullptr);
+
+	*lppInfo					= nullptr;
+	TAgentSocketObj* pSocketObj	= FindSocketObj(dwConnID);
+
+	if(!TAgentSocketObj::IsValid(pSocketObj))
+	{
+		::SetLastError(ERROR_OBJECT_NOT_FOUND);
+		return FALSE;
+	}
+
+	CSSLSession* pSession = nullptr;
+	GetConnectionReserved2(pSocketObj, (PVOID*)&pSession);
+
+	if(pSession == nullptr || !pSession->IsValid())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	return pSession->GetSessionInfo(enInfo, lppInfo);
 }
 
 #endif

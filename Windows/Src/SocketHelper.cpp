@@ -37,6 +37,9 @@
 	#endif
 #endif
 
+static const BYTE s_szUdpCloseNotify[]	= {0xBE, 0xB6, 0x1F, 0xEB, 0xDA, 0x52, 0x46, 0xBA, 0x92, 0x33, 0x59, 0xDB, 0xBF, 0xE6, 0xC8, 0xE4};
+static int s_iUdpCloseNotifySize		= ARRAY_SIZE(s_szUdpCloseNotify);
+
 const hp_addr hp_addr::ANY_ADDR4(AF_INET, TRUE);
 const hp_addr hp_addr::ANY_ADDR6(AF_INET6, TRUE);
 
@@ -139,7 +142,6 @@ BOOL GetSockAddrByHostName(LPCTSTR lpszHost, USHORT usPort, HP_SOCKADDR& addr)
 		return GetSockAddr(lpszHost, usPort, addr);
 
 	return GetSockAddrByHostNameDirectly(lpszHost, usPort, addr);
-
 }
 
 BOOL GetSockAddrByHostNameDirectly(LPCTSTR lpszHost, USHORT usPort, HP_SOCKADDR& addr)
@@ -272,7 +274,7 @@ BOOL RetrieveSockAddrIPAddresses(const vector<HP_PSOCKADDR>& vt, LPTIPAddr** lpp
 		iAddrLength	= HP_SOCKADDR::AddrMinStrLength(pSockAddr->family) + 6;
 		lpszAddr	= new TCHAR[iAddrLength];
 
-		VERIFY(sockaddr_IN_2_A(*vt[i], usFamily, lpszAddr, iAddrLength, usPort));
+		ENSURE(sockaddr_IN_2_A(*vt[i], usFamily, lpszAddr, iAddrLength, usPort));
 
 		lpItem			= new TIPAddr;
 		lpItem->type	= pSockAddr->IsIPv4() ? IPT_IPV4 : IPT_IPV6;
@@ -531,6 +533,16 @@ BOOL PostIocpSend(HANDLE hIOCP, CONNID dwConnID)
 	return PostIocpCommand(hIOCP, IOCP_CMD_SEND, dwConnID);
 }
 
+BOOL PostIocpUnpause(HANDLE hIOCP, CONNID dwConnID)
+{
+	return PostIocpCommand(hIOCP, IOCP_CMD_UNPAUSE, dwConnID);
+}
+
+BOOL PostIocpTimeout(HANDLE hIOCP, CONNID dwConnID)
+{
+	return PostIocpCommand(hIOCP, IOCP_CMD_TIMEOUT, dwConnID);
+}
+
 BOOL PostIocpClose(HANDLE hIOCP, CONNID dwConnID, int iErrorCode)
 {
 	return PostIocpCommand(hIOCP, (EnIocpCommand)iErrorCode, dwConnID);
@@ -635,6 +647,11 @@ int SSO_ReuseAddress(SOCKET sock, BOOL bReuse)
 	return setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (CHAR*)&bReuse, sizeof(BOOL));
 }
 
+int SSO_ExclusiveAddressUse(SOCKET sock, BOOL bExclusive)
+{
+	return setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (CHAR*)&bExclusive, sizeof(BOOL));
+}
+
 int SSO_UDP_ConnReset(SOCKET sock, BOOL bNewBehavior)
 {
 	int result = NO_ERROR;
@@ -674,13 +691,26 @@ CONNID GenerateConnectionID()
 	return dwConnID;
 }
 
-int ManualCloseSocket(SOCKET sock, int iShutdownFlag, BOOL bGraceful, BOOL bReuseAddress)
+int IsUdpCloseNotify(const BYTE* pData, int iLength)
+{
+	return (iLength == s_iUdpCloseNotifySize								&&
+			memcmp(pData, s_szUdpCloseNotify, s_iUdpCloseNotifySize) == 0)	;
+}
+
+int SendUdpCloseNotify(SOCKET sock)
+{
+	return send(sock, (LPCSTR)s_szUdpCloseNotify, s_iUdpCloseNotifySize, 0);
+}
+
+int SendUdpCloseNotify(SOCKET sock, const HP_SOCKADDR& remoteAddr)
+{
+	return sendto(sock, (LPCSTR)s_szUdpCloseNotify, s_iUdpCloseNotifySize, 0, remoteAddr.Addr(), remoteAddr.AddrSize());
+}
+
+int ManualCloseSocket(SOCKET sock, int iShutdownFlag, BOOL bGraceful)
 {
 	if(!bGraceful)
 		SSO_Linger(sock, 1, 0);
-
-	if(bReuseAddress)
-		SSO_ReuseAddress(sock, bReuseAddress);
 
 	if(iShutdownFlag != 0xFF)
 		shutdown(sock, iShutdownFlag);
@@ -1040,7 +1070,7 @@ BOOL GbkToUtf8(const char szSrc[], char szDest[], int& iDestLength)
 	}
 
 	unique_ptr<WCHAR[]> p(new WCHAR[iMiddleLength]);
-	VERIFY(GbkToUnicode(szSrc, p.get(), iMiddleLength));
+	ENSURE(GbkToUnicode(szSrc, p.get(), iMiddleLength));
 
 	return UnicodeToUtf8(p.get(), szDest, iDestLength);
 }
@@ -1057,7 +1087,7 @@ BOOL Utf8ToGbk(const char szSrc[], char szDest[], int& iDestLength)
 	}
 
 	unique_ptr<WCHAR[]> p(new WCHAR[iMiddleLength]);
-	VERIFY(Utf8ToUnicode(szSrc, p.get(), iMiddleLength));
+	ENSURE(Utf8ToUnicode(szSrc, p.get(), iMiddleLength));
 
 	return UnicodeToGbk(p.get(), szDest, iDestLength);
 }

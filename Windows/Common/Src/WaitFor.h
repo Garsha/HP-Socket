@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,20 +30,22 @@ DWORD TimeGetTime();
 描述: 获取当前时间与原始时间的时间差
 参数: 
 		dwOriginal	: 原始时间（毫秒），通常用 timeGetTime() 或 GetTickCount() 获取
+		dwCurrent	: 当前时间（毫秒），通常用 timeGetTime() 或 GetTickCount() 获取
 
 返回值:	与当前 timeGetTime() 之间的时间差
 **********************************/
-DWORD GetTimeGap32(DWORD dwOriginal);
+DWORD GetTimeGap32(DWORD dwOriginal, DWORD dwCurrent = 0);
 
 #if _WIN32_WINNT >= _WIN32_WINNT_WS08
 /**********************************
 描述: 获取当前时间与原始时间的时间差
 参数: 
 		ullOriginal	: 原始时间（毫秒），通常用 GetTickCount64() 获取
+		ullCurrent	: 当前时间（毫秒），通常用 GetTickCount64() 获取
 
 返回值:	与当前 GetTickCount64() 之间的时间差
 **********************************/
-ULONGLONG GetTimeGap64(ULONGLONG ullOriginal);
+ULONGLONG GetTimeGap64(ULONGLONG ullOriginal, ULONGLONG ullCurrent = 0);
 #endif
 
 /**********************************
@@ -71,7 +73,7 @@ BOOL PeekMessageLoop(BOOL bDispatchQuitMsg = TRUE);
 		WAIT_TIMEOUT		: 超时
 		WAIT_FAILED			: 执行失败
 **********************************/
-DWORD WaitForMultipleObjectsWithMessageLoop(DWORD dwHandles, HANDLE szHandles[], DWORD dwMilliseconds = INFINITE, DWORD dwWakeMask = QS_ALLINPUT, DWORD dwFlags = MWMO_INPUTAVAILABLE);
+DWORD WaitForMultipleObjectsWithMessageLoop(DWORD dwHandles, HANDLE szHandles[], DWORD dwMilliseconds = INFINITE, BOOL bWaitAll = FALSE, DWORD dwWakeMask = QS_ALLINPUT);
 
 /**********************************
 描述: 等待指定时间, 同时处理Windows消息
@@ -83,7 +85,13 @@ DWORD WaitForMultipleObjectsWithMessageLoop(DWORD dwHandles, HANDLE szHandles[],
 
 返回值: TRUE: 等待成功，FALSE: 超时		
 **********************************/
-BOOL MsgWaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds = INFINITE, DWORD dwWakeMask = QS_ALLINPUT, DWORD dwFlags = MWMO_INPUTAVAILABLE);
+BOOL MsgWaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds = INFINITE, BOOL bWaitAll = FALSE, DWORD dwWakeMask = QS_ALLINPUT);
+
+/**********************************
+描述: 等待指定时间		
+返回值: (无)		
+**********************************/
+void WaitFor(DWORD dwMilliseconds);
 
 /**********************************
 描述: 等待指定时间, 同时处理Windows消息
@@ -92,12 +100,12 @@ BOOL MsgWaitForSingleObject(HANDLE hHandle, DWORD dwMilliseconds = INFINITE, DWO
 		dwWakeMask		: 消息过滤标识
 		dwFlags			: 等待类型
 
-返回值: MsgWaitForMultipleObjectsEx() 函数的操作结果		
+返回值: (无)		
 **********************************/
-void WaitWithMessageLoop(DWORD dwMilliseconds, DWORD dwWakeMask = QS_ALLINPUT, DWORD dwFlags = MWMO_INPUTAVAILABLE);
+void WaitWithMessageLoop(DWORD dwMilliseconds, DWORD dwWakeMask = QS_ALLINPUT);
 
 /**********************************
-描述: 等待用Sleep()函数等待某个变量小于指定值
+描述: 等待某个变量小于指定值
 参数: 
 		plWorkingItemCount		: 监视变量
 		lMaxWorkingItemCount	: 指定值
@@ -107,7 +115,7 @@ void WaitWithMessageLoop(DWORD dwMilliseconds, DWORD dwWakeMask = QS_ALLINPUT, D
 **********************************/
 void WaitForWorkingQueue(long* plWorkingItemCount, long lMaxWorkingItemCount, DWORD dwCheckInterval);
 /**********************************
-描述: 等待用Sleep()函数等待某个变量减小到 0
+描述: 等待某个变量减小到 0
 参数: 
 		plWorkingItemCount		: 监视变量
 		dwCheckInterval			: 检查间隔 (毫秒)
@@ -135,3 +143,18 @@ void MsgWaitForWorkingQueue	(long* plWorkingItemCount, long lMaxWorkingItemCount
 返回值: 		
 **********************************/
 void MsgWaitForComplete		(long* plWorkingItemCount, DWORD dwCheckInterval = 10);
+
+/**********************************
+描述: 设置时钟分辨率
+**********************************/
+class CTimePeriod
+{
+public:
+	CTimePeriod(UINT uiPeriod = 0);
+	~CTimePeriod();
+
+	BOOL IsValid() {return m_uiPeriod != 0;}
+
+private:
+	UINT m_uiPeriod;
+};

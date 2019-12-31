@@ -39,7 +39,7 @@ BOOL CSSLClient::CheckParams()
 
 void CSSLClient::PrepareStart()
 {
-	m_dwMainThreadID = ::GetCurrentThreadId();
+	m_dwMainThreadID = SELF_THREAD_ID;
 
 	__super::PrepareStart();
 }
@@ -57,7 +57,7 @@ void CSSLClient::Reset()
 	__super::Reset();
 }
 
-void CSSLClient::OnWorkerThreadEnd(DWORD dwThreadID)
+void CSSLClient::OnWorkerThreadEnd(THR_ID dwThreadID)
 {
 	m_sslCtx.RemoveThreadLocalState();
 
@@ -68,25 +68,83 @@ BOOL CSSLClient::SendPackets(const WSABUF pBuffers[], int iCount)
 {
 	ASSERT(pBuffers && iCount > 0);
 
-	return ::ProcessSend(this, this, &m_sslSession, pBuffers, iCount);
+	if(m_sslSession.IsValid())
+		return ::ProcessSend(this, this, &m_sslSession, pBuffers, iCount);
+	else
+		return DoSendPackets(this, pBuffers, iCount);
 }
 
 EnHandleResult CSSLClient::FireConnect()
 {
 	EnHandleResult result = DoFireConnect(this);
 
-	if(result != HR_ERROR)
-	{
-		m_sslSession.Renew(m_sslCtx, m_strHost);
-		VERIFY(::ProcessHandShake(this, this, &m_sslSession) == HR_OK);
-	}
+	if(result != HR_ERROR && m_bSSLAutoHandShake)
+		DoSSLHandShake();
 
 	return result;
 }
 
 EnHandleResult CSSLClient::FireReceive(const BYTE* pData, int iLength)
 {
-	return ::ProcessReceive(this, this, &m_sslSession, pData, iLength);
+	if(m_sslSession.IsValid())
+		return ::ProcessReceive(this, this, &m_sslSession, pData, iLength);
+	else
+		return DoFireReceive(this, pData, iLength);
+}
+
+BOOL CSSLClient::StartSSLHandShake()
+{
+	if(IsSSLAutoHandShake())
+	{
+		::SetLastError(ERROR_INVALID_OPERATION);
+		return FALSE;
+	}
+
+	return StartSSLHandShakeNoCheck();
+}
+
+BOOL CSSLClient::StartSSLHandShakeNoCheck()
+{
+	if(!IsConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	CCriSecLock locallock(m_sslSession.GetSendLock());
+
+	if(!IsConnected())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	if(m_sslSession.IsValid())
+	{
+		::SetLastError(ERROR_ALREADY_INITIALIZED);
+		return FALSE;
+	}
+
+	DoSSLHandShake();
+
+	return TRUE;
+}
+
+void CSSLClient::DoSSLHandShake()
+{
+	m_sslSession.Renew(m_sslCtx, m_strHost);
+	ENSURE(::ProcessHandShake(this, this, &m_sslSession) == HR_OK);
+}
+
+BOOL CSSLClient::GetSSLSessionInfo(EnSSLSessionInfo enInfo, LPVOID* lppInfo)
+{
+	if(!m_sslSession.IsValid())
+	{
+		::SetLastError(ERROR_INVALID_STATE);
+		return FALSE;
+	}
+
+	return m_sslSession.GetSessionInfo(enInfo, lppInfo);
 }
 
 #endif

@@ -90,18 +90,18 @@ template<class B> EnFetchResult PeekBuffer(B* pBuffer, BYTE* pData, int iLength)
 	return result;
 }
 
-template<class T, class B, class S> EnHandleResult ParsePack(T* pThis, TPackInfo<B>* pInfo, B* pBuffer, S* pSocket, DWORD dwMaxPackSize, USHORT usPackHeaderFlag, const BYTE* pData, int iLength)
+template<class T, class B, class S> EnHandleResult ParsePack(T* pThis, TPackInfo<B>* pInfo, B* pBuffer, S* pSocket, DWORD dwMaxPackSize, USHORT usPackHeaderFlag)
 {
 	EnHandleResult rs = HR_OK;
 
-	pBuffer->Cat(pData, iLength);
-	iLength = pBuffer->Length();
-
 	int required = pInfo->length;
-	int remain	 = iLength;
+	int remain	 = pBuffer->Length();
 
 	while(remain >= required)
 	{
+		if(pSocket->IsPaused())
+			break;
+
 		remain -= required;
 		CBufferPtr buffer(required);
 
@@ -147,4 +147,11 @@ template<class T, class B, class S> EnHandleResult ParsePack(T* pThis, TPackInfo
 	}
 
 	return rs;
+}
+
+template<class T, class B, class S> EnHandleResult ParsePack(T* pThis, TPackInfo<B>* pInfo, B* pBuffer, S* pSocket, DWORD dwMaxPackSize, USHORT usPackHeaderFlag, const BYTE* pData, int iLength)
+{
+	pBuffer->Cat(pData, iLength);
+
+	return ParsePack(pThis, pInfo, pBuffer, pSocket, dwMaxPackSize, usPackHeaderFlag);
 }

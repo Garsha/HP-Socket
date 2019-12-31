@@ -26,10 +26,12 @@
 #include "SocketHelper.h"
 #include "./common/GeneralHelper.h"
 
+#ifdef _UDP_SUPPORT
+
 class CUdpCast : public IUdpCast
 {
 public:
-	virtual BOOL Start	(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect = TRUE, LPCTSTR lpszBindAddress = nullptr);
+	virtual BOOL Start	(LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect = TRUE, LPCTSTR lpszBindAddress = nullptr, USHORT usLocalPort = 0);
 	virtual BOOL Stop	();
 	virtual BOOL Send	(const BYTE* pBuffer, int iLength, int iOffset = 0);
 	virtual BOOL SendPackets	(const WSABUF pBuffers[], int iCount);
@@ -44,6 +46,7 @@ public:
 	virtual BOOL GetRemoteHost			(TCHAR lpszHost[], int& iHostLen, USHORT& usPort);
 	virtual BOOL GetPendingDataLength	(int& iPending) {iPending = m_lsSend.Length(); return HasStarted();}
 	virtual BOOL IsPauseReceive			(BOOL& bPaused) {bPaused = m_bPaused; return HasStarted();}
+	virtual BOOL IsConnected			()				{return m_bConnected;}
 
 public:
 	virtual BOOL IsSecure				() {return FALSE;}
@@ -97,7 +100,8 @@ protected:
 	virtual void PrepareStart();
 	virtual void Reset();
 
-	virtual void OnWorkerThreadEnd(THR_ID dwThreadID) {}
+	virtual void OnWorkerThreadStart(THR_ID tid) {}
+	virtual void OnWorkerThreadEnd(THR_ID tid) {}
 
 protected:
 	void SetReserved	(PVOID pReserved)	{m_pReserved = pReserved;}						
@@ -106,6 +110,7 @@ protected:
 
 private:
 	void SetRemoteHost	(LPCTSTR lpszHost, USHORT usPort);
+	void SetConnected	(BOOL bConnected = TRUE) {m_bConnected = bConnected; if(bConnected) m_enState = SS_STARTED;}
 
 	BOOL CheckStarting();
 	BOOL CheckStoping();
@@ -125,19 +130,14 @@ private:
 	BOOL HandleRead(SHORT events);
 	BOOL HandleWrite(SHORT events);
 
-	void SetConnected	() {m_bConnected = TRUE; m_enState = SS_STARTED;}
-	BOOL HasConnected	() {return m_bConnected;}
-
 	UINT WINAPI WorkerThreadProc(LPVOID pv);
 
 public:
 	CUdpCast(IUdpCastListener* pListener)
 	: m_pListener			(pListener)
 	, m_lsSend				(m_itPool)
-	, m_soRecv				(INVALID_SOCKET)
-	, m_soSend				(INVALID_SOCKET)
-	, m_nRecvEvents			(0)
-	, m_nSendEvents			(0)
+	, m_soClient			(INVALID_SOCKET)
+	, m_nEvents				(0)
 	, m_dwConnID			(0)
 	, m_usPort				(0)
 	, m_bPaused				(FALSE)
@@ -161,17 +161,15 @@ public:
 
 	virtual ~CUdpCast()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
 	IUdpCastListener*	m_pListener;
 	TClientCloseContext m_ccContext;
 
-	SOCKET				m_soRecv;
-	SOCKET				m_soSend;
-	SHORT				m_nRecvEvents;
-	SHORT				m_nSendEvents;
+	SOCKET				m_soClient;
+	SHORT				m_nEvents;
 	CONNID				m_dwConnID;
 
 	BOOL				m_bReuseAddress;
@@ -215,3 +213,5 @@ private:
 
 	CThread<CUdpCast, VOID, UINT> m_thWorker;
 };
+
+#endif

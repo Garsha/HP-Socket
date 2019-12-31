@@ -40,23 +40,27 @@ protected:
 	friend struct											THttpObj;
 
 public:
-
 	virtual BOOL Start(LPCTSTR lpszBindAddress, USHORT usPort);
 
 	virtual BOOL SendResponse(CONNID dwConnID, USHORT usStatusCode, LPCSTR lpszDesc = nullptr, const THeader lpHeaders[] = nullptr, int iHeaderCount = 0, const BYTE* pData = nullptr, int iLength = 0);
 	virtual BOOL SendLocalFile(CONNID dwConnID, LPCSTR lpszFileName, USHORT usStatusCode = HSC_OK, LPCSTR lpszDesc = nullptr, const THeader lpHeaders[] = nullptr, int iHeaderCount = 0);
+	virtual BOOL SendChunkData(CONNID dwConnID, const BYTE* pData = nullptr, int iLength = 0, LPCSTR lpszExtensions = nullptr);
 
 	virtual BOOL Release(CONNID dwConnID);
 
-	virtual BOOL SendWSMessage(CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4] = nullptr, BYTE* pData = nullptr, int iLength = 0, ULONGLONG ullBodyLen = 0);
+	virtual BOOL SendWSMessage(CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE* pData = nullptr, int iLength = 0, ULONGLONG ullBodyLen = 0);
+
+	virtual BOOL StartHttp(CONNID dwConnID);
 
 public:
+	virtual void SetHttpAutoStart(BOOL bAutoStart)				{m_bHttpAutoStart = bAutoStart;}
+	virtual BOOL IsHttpAutoStart()								{return m_bHttpAutoStart;}
 
 	virtual void SetLocalVersion(EnHttpVersion enLocalVersion)	{m_enLocalVersion = enLocalVersion;}
 	virtual void SetReleaseDelay(DWORD dwReleaseDelay)			{m_dwReleaseDelay = dwReleaseDelay;}
 
-	virtual EnHttpVersion GetLocalVersion	()	{return m_enLocalVersion;}
-	virtual DWORD GetReleaseDelay			()	{return m_dwReleaseDelay;}
+	virtual EnHttpVersion GetLocalVersion	()					{return m_enLocalVersion;}
+	virtual DWORD GetReleaseDelay			()					{return m_dwReleaseDelay;}
 
 	virtual BOOL IsUpgrade(CONNID dwConnID);
 	virtual BOOL IsKeepAlive(CONNID dwConnID);
@@ -84,8 +88,13 @@ public:
 	virtual BOOL GetWSMessageState(CONNID dwConnID, BOOL* lpbFinal, BYTE* lpiReserved, BYTE* lpiOperationCode, LPCBYTE* lpszMask, ULONGLONG* lpullBodyLen, ULONGLONG* lpullBodyRemain);
 
 private:
+	BOOL StartHttp(TSocketObj* pSocketObj);
+	void DoStartHttp(TSocketObj* pSocketObj);
+
+private:
 	virtual BOOL CheckParams();
 	virtual void PrepareStart();
+	virtual EnHandleResult FireAccept(TSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireAccept(TSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireHandShake(TSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireReceive(TSocketObj* pSocketObj, const BYTE* pData, int iLength);
@@ -142,6 +151,7 @@ public:
 	CHttpServerT(IHttpServerListener* pListener)
 	: T					(pListener)
 	, m_pListener		(pListener)
+	, m_bHttpAutoStart	(TRUE)
 	, m_enLocalVersion	(DEFAULT_HTTP_VERSION)
 	, m_dwReleaseDelay	(DEFAULT_HTTP_RELEASE_DELAY)
 	{
@@ -150,7 +160,7 @@ public:
 
 	virtual ~CHttpServerT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
@@ -161,6 +171,8 @@ private:
 
 	EnHttpVersion				m_enLocalVersion;
 	DWORD						m_dwReleaseDelay;
+
+	BOOL						m_bHttpAutoStart;
 
 	CCASQueue<TDyingConnection>	m_lsDyingQueue;
 

@@ -32,15 +32,22 @@
 #include "TcpPackServer.h"
 #include "TcpPackClient.h"
 #include "TcpPackAgent.h"
+
+#ifdef _UDP_SUPPORT
 #include "UdpServer.h"
 #include "UdpClient.h"
 #include "UdpCast.h"
+#include "UdpArqServer.h"
+#include "UdpArqClient.h"
+#endif
 
 #ifdef _HTTP_SUPPORT
 #include "HttpServer.h"
 #include "HttpAgent.h"
 #include "HttpClient.h"
 #endif
+
+#include "HPThreadPool.h"
 
 #if !defined(_WIN64) && !defined(HPSOCKET_STATIC_LIB)
 
@@ -62,12 +69,6 @@
 	#pragma comment(linker, "/EXPORT:Create_HP_TcpPullServerListener=_Create_HP_TcpPullServerListener@0")
 	#pragma comment(linker, "/EXPORT:Create_HP_TcpServer=_Create_HP_TcpServer@4")
 	#pragma comment(linker, "/EXPORT:Create_HP_TcpServerListener=_Create_HP_TcpServerListener@0")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpCast=_Create_HP_UdpCast@4")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpCastListener=_Create_HP_UdpCastListener@0")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpClient=_Create_HP_UdpClient@4")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpClientListener=_Create_HP_UdpClientListener@0")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpServer=_Create_HP_UdpServer@4")
-	#pragma comment(linker, "/EXPORT:Create_HP_UdpServerListener=_Create_HP_UdpServerListener@0")
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpAgent=_Destroy_HP_TcpAgent@4")
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpAgentListener=_Destroy_HP_TcpAgentListener@4")
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpClient=_Destroy_HP_TcpClient@4")
@@ -86,14 +87,12 @@
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpPullServerListener=_Destroy_HP_TcpPullServerListener@4")
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpServer=_Destroy_HP_TcpServer@4")
 	#pragma comment(linker, "/EXPORT:Destroy_HP_TcpServerListener=_Destroy_HP_TcpServerListener@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpCast=_Destroy_HP_UdpCast@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpCastListener=_Destroy_HP_UdpCastListener@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpClient=_Destroy_HP_UdpClient@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpClientListener=_Destroy_HP_UdpClientListener@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpServer=_Destroy_HP_UdpServer@4")
-	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpServerListener=_Destroy_HP_UdpServerListener@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_Connect=_HP_Agent_Connect@16")
 	#pragma comment(linker, "/EXPORT:HP_Agent_ConnectWithExtra=_HP_Agent_ConnectWithExtra@20")
+	#pragma comment(linker, "/EXPORT:HP_Agent_ConnectWithLocalPort=_HP_Agent_ConnectWithLocalPort@20")
+	#pragma comment(linker, "/EXPORT:HP_Agent_ConnectWithLocalAddress=_HP_Agent_ConnectWithLocalAddress@20")
+	#pragma comment(linker, "/EXPORT:HP_Agent_ConnectWithExtraAndLocalPort=_HP_Agent_ConnectWithExtraAndLocalPort@24")
+	#pragma comment(linker, "/EXPORT:HP_Agent_ConnectWithExtraAndLocalAddressPort=_HP_Agent_ConnectWithExtraAndLocalAddressPort@28")
 	#pragma comment(linker, "/EXPORT:HP_Agent_Disconnect=_HP_Agent_Disconnect@12")
 	#pragma comment(linker, "/EXPORT:HP_Agent_DisconnectLongConnections=_HP_Agent_DisconnectLongConnections@12")
 	#pragma comment(linker, "/EXPORT:HP_Agent_DisconnectSilenceConnections=_HP_Agent_DisconnectSilenceConnections@12")
@@ -114,12 +113,14 @@
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetRemoteAddress=_HP_Agent_GetRemoteAddress@20")
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetRemoteHost=_HP_Agent_GetRemoteHost@20")
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetSendPolicy=_HP_Agent_GetSendPolicy@4")
+	#pragma comment(linker, "/EXPORT:HP_Agent_GetOnSendSyncPolicy=_HP_Agent_GetOnSendSyncPolicy@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetSilencePeriod=_HP_Agent_GetSilencePeriod@12")
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetState=_HP_Agent_GetState@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_GetWorkerThreadCount=_HP_Agent_GetWorkerThreadCount@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_HasStarted=_HP_Agent_HasStarted@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_IsMarkSilence=_HP_Agent_IsMarkSilence@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_IsPauseReceive=_HP_Agent_IsPauseReceive@12")
+	#pragma comment(linker, "/EXPORT:HP_Agent_IsConnected=_HP_Agent_IsConnected@8")
 	#pragma comment(linker, "/EXPORT:HP_Agent_IsSecure=_HP_Agent_IsSecure@4")
 	#pragma comment(linker, "/EXPORT:HP_Agent_PauseReceive=_HP_Agent_PauseReceive@12")
 	#pragma comment(linker, "/EXPORT:HP_Agent_Send=_HP_Agent_Send@16")
@@ -134,6 +135,7 @@
 	#pragma comment(linker, "/EXPORT:HP_Agent_SetMarkSilence=_HP_Agent_SetMarkSilence@8")
 	#pragma comment(linker, "/EXPORT:HP_Agent_SetMaxConnectionCount=_HP_Agent_SetMaxConnectionCount@8")
 	#pragma comment(linker, "/EXPORT:HP_Agent_SetSendPolicy=_HP_Agent_SetSendPolicy@8")
+	#pragma comment(linker, "/EXPORT:HP_Agent_SetOnSendSyncPolicy=_HP_Agent_SetOnSendSyncPolicy@8")
 	#pragma comment(linker, "/EXPORT:HP_Agent_SetWorkerThreadCount=_HP_Agent_SetWorkerThreadCount@8")
 	#pragma comment(linker, "/EXPORT:HP_Agent_Start=_HP_Agent_Start@12")
 	#pragma comment(linker, "/EXPORT:HP_Agent_Stop=_HP_Agent_Stop@4")
@@ -149,6 +151,7 @@
 	#pragma comment(linker, "/EXPORT:HP_Client_GetState=_HP_Client_GetState@4")
 	#pragma comment(linker, "/EXPORT:HP_Client_HasStarted=_HP_Client_HasStarted@4")
 	#pragma comment(linker, "/EXPORT:HP_Client_IsPauseReceive=_HP_Client_IsPauseReceive@8")
+	#pragma comment(linker, "/EXPORT:HP_Client_IsConnected=_HP_Client_IsConnected@4")
 	#pragma comment(linker, "/EXPORT:HP_Client_IsSecure=_HP_Client_IsSecure@4")
 	#pragma comment(linker, "/EXPORT:HP_Client_PauseReceive=_HP_Client_PauseReceive@8")
 	#pragma comment(linker, "/EXPORT:HP_Client_Send=_HP_Client_Send@12")
@@ -159,6 +162,7 @@
 	#pragma comment(linker, "/EXPORT:HP_Client_SetFreeBufferPoolSize=_HP_Client_SetFreeBufferPoolSize@8")
 	#pragma comment(linker, "/EXPORT:HP_Client_Start=_HP_Client_Start@16")
 	#pragma comment(linker, "/EXPORT:HP_Client_StartWithBindAddress=_HP_Client_StartWithBindAddress@20")
+	#pragma comment(linker, "/EXPORT:HP_Client_StartWithBindAddressAndLocalPort=_HP_Client_StartWithBindAddressAndLocalPort@24")
 	#pragma comment(linker, "/EXPORT:HP_Client_Stop=_HP_Client_Stop@4")
 	#pragma comment(linker, "/EXPORT:HP_GetHPSocketVersion=_HP_GetHPSocketVersion@0")
 	#pragma comment(linker, "/EXPORT:HP_GetSocketErrorDesc=_HP_GetSocketErrorDesc@4")
@@ -182,12 +186,14 @@
 	#pragma comment(linker, "/EXPORT:HP_Server_GetPendingDataLength=_HP_Server_GetPendingDataLength@12")
 	#pragma comment(linker, "/EXPORT:HP_Server_GetRemoteAddress=_HP_Server_GetRemoteAddress@20")
 	#pragma comment(linker, "/EXPORT:HP_Server_GetSendPolicy=_HP_Server_GetSendPolicy@4")
+	#pragma comment(linker, "/EXPORT:HP_Server_GetOnSendSyncPolicy=_HP_Server_GetOnSendSyncPolicy@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_GetSilencePeriod=_HP_Server_GetSilencePeriod@12")
 	#pragma comment(linker, "/EXPORT:HP_Server_GetState=_HP_Server_GetState@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_GetWorkerThreadCount=_HP_Server_GetWorkerThreadCount@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_HasStarted=_HP_Server_HasStarted@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_IsMarkSilence=_HP_Server_IsMarkSilence@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_IsPauseReceive=_HP_Server_IsPauseReceive@12")
+	#pragma comment(linker, "/EXPORT:HP_Server_IsConnected=_HP_Server_IsConnected@8")
 	#pragma comment(linker, "/EXPORT:HP_Server_IsSecure=_HP_Server_IsSecure@4")
 	#pragma comment(linker, "/EXPORT:HP_Server_PauseReceive=_HP_Server_PauseReceive@12")
 	#pragma comment(linker, "/EXPORT:HP_Server_Send=_HP_Server_Send@16")
@@ -202,6 +208,7 @@
 	#pragma comment(linker, "/EXPORT:HP_Server_SetMarkSilence=_HP_Server_SetMarkSilence@8")
 	#pragma comment(linker, "/EXPORT:HP_Server_SetMaxConnectionCount=_HP_Server_SetMaxConnectionCount@8")
 	#pragma comment(linker, "/EXPORT:HP_Server_SetSendPolicy=_HP_Server_SetSendPolicy@8")
+	#pragma comment(linker, "/EXPORT:HP_Server_SetOnSendSyncPolicy=_HP_Server_SetOnSendSyncPolicy@8")
 	#pragma comment(linker, "/EXPORT:HP_Server_SetWorkerThreadCount=_HP_Server_SetWorkerThreadCount@8")
 	#pragma comment(linker, "/EXPORT:HP_Server_Start=_HP_Server_Start@12")
 	#pragma comment(linker, "/EXPORT:HP_Server_Stop=_HP_Server_Stop@4")
@@ -273,6 +280,20 @@
 	#pragma comment(linker, "/EXPORT:HP_TcpServer_SetKeepAliveTime=_HP_TcpServer_SetKeepAliveTime@8")
 	#pragma comment(linker, "/EXPORT:HP_TcpServer_SetSocketBufferSize=_HP_TcpServer_SetSocketBufferSize@8")
 	#pragma comment(linker, "/EXPORT:HP_TcpServer_SetSocketListenQueue=_HP_TcpServer_SetSocketListenQueue@8")
+
+#ifdef _UDP_SUPPORT
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpCast=_Create_HP_UdpCast@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpCastListener=_Create_HP_UdpCastListener@0")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpClient=_Create_HP_UdpClient@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpClientListener=_Create_HP_UdpClientListener@0")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpServer=_Create_HP_UdpServer@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpServerListener=_Create_HP_UdpServerListener@0")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpCast=_Destroy_HP_UdpCast@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpCastListener=_Destroy_HP_UdpCastListener@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpClient=_Destroy_HP_UdpClient@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpClientListener=_Destroy_HP_UdpClientListener@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpServer=_Destroy_HP_UdpServer@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpServerListener=_Destroy_HP_UdpServerListener@4")
 	#pragma comment(linker, "/EXPORT:HP_UdpCast_GetCastMode=_HP_UdpCast_GetCastMode@4")
 	#pragma comment(linker, "/EXPORT:HP_UdpCast_GetMaxDatagramSize=_HP_UdpCast_GetMaxDatagramSize@4")
 	#pragma comment(linker, "/EXPORT:HP_UdpCast_GetMultiCastTtl=_HP_UdpCast_GetMultiCastTtl@4")
@@ -298,6 +319,59 @@
 	#pragma comment(linker, "/EXPORT:HP_UdpServer_SetDetectInterval=_HP_UdpServer_SetDetectInterval@8")
 	#pragma comment(linker, "/EXPORT:HP_UdpServer_SetMaxDatagramSize=_HP_UdpServer_SetMaxDatagramSize@8")
 	#pragma comment(linker, "/EXPORT:HP_UdpServer_SetPostReceiveCount=_HP_UdpServer_SetPostReceiveCount@8")
+
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpArqClient=_Create_HP_UdpArqClient@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpArqServer=_Create_HP_UdpArqServer@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpArqClient=_Destroy_HP_UdpArqClient@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpArqServer=_Destroy_HP_UdpArqServer@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpArqClientListener=_Create_HP_UdpArqClientListener@0")
+	#pragma comment(linker, "/EXPORT:Create_HP_UdpArqServerListener=_Create_HP_UdpArqServerListener@0")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpArqClientListener=_Destroy_HP_UdpArqClientListener@4")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_UdpArqServerListener=_Destroy_HP_UdpArqServerListener@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetNoDelay=_HP_UdpArqServer_SetNoDelay@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetTurnoffCongestCtrl=_HP_UdpArqServer_SetTurnoffCongestCtrl@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetFlushInterval=_HP_UdpArqServer_SetFlushInterval@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetResendByAcks=_HP_UdpArqServer_SetResendByAcks@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetSendWndSize=_HP_UdpArqServer_SetSendWndSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetRecvWndSize=_HP_UdpArqServer_SetRecvWndSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetMinRto=_HP_UdpArqServer_SetMinRto@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetMaxTransUnit=_HP_UdpArqServer_SetMaxTransUnit@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetMaxMessageSize=_HP_UdpArqServer_SetMaxMessageSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_SetHandShakeTimeout=_HP_UdpArqServer_SetHandShakeTimeout@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_IsNoDelay=_HP_UdpArqServer_IsNoDelay@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_IsTurnoffCongestCtrl=_HP_UdpArqServer_IsTurnoffCongestCtrl@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetFlushInterval=_HP_UdpArqServer_GetFlushInterval@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetResendByAcks=_HP_UdpArqServer_GetResendByAcks@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetSendWndSize=_HP_UdpArqServer_GetSendWndSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetRecvWndSize=_HP_UdpArqServer_GetRecvWndSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetMinRto=_HP_UdpArqServer_GetMinRto@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetMaxTransUnit=_HP_UdpArqServer_GetMaxTransUnit@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetMaxMessageSize=_HP_UdpArqServer_GetMaxMessageSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetHandShakeTimeout=_HP_UdpArqServer_GetHandShakeTimeout@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqServer_GetWaitingSendMessageCount=_HP_UdpArqServer_GetWaitingSendMessageCount@12")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetNoDelay=_HP_UdpArqClient_SetNoDelay@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetTurnoffCongestCtrl=_HP_UdpArqClient_SetTurnoffCongestCtrl@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetFlushInterval=_HP_UdpArqClient_SetFlushInterval@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetResendByAcks=_HP_UdpArqClient_SetResendByAcks@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetSendWndSize=_HP_UdpArqClient_SetSendWndSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetRecvWndSize=_HP_UdpArqClient_SetRecvWndSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetMinRto=_HP_UdpArqClient_SetMinRto@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetMaxTransUnit=_HP_UdpArqClient_SetMaxTransUnit@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetMaxMessageSize=_HP_UdpArqClient_SetMaxMessageSize@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_SetHandShakeTimeout=_HP_UdpArqClient_SetHandShakeTimeout@8")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_IsNoDelay=_HP_UdpArqClient_IsNoDelay@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_IsTurnoffCongestCtrl=_HP_UdpArqClient_IsTurnoffCongestCtrl@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetFlushInterval=_HP_UdpArqClient_GetFlushInterval@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetResendByAcks=_HP_UdpArqClient_GetResendByAcks@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetSendWndSize=_HP_UdpArqClient_GetSendWndSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetRecvWndSize=_HP_UdpArqClient_GetRecvWndSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetMinRto=_HP_UdpArqClient_GetMinRto@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetMaxTransUnit=_HP_UdpArqClient_GetMaxTransUnit@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetMaxMessageSize=_HP_UdpArqClient_GetMaxMessageSize@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetHandShakeTimeout=_HP_UdpArqClient_GetHandShakeTimeout@4")
+	#pragma comment(linker, "/EXPORT:HP_UdpArqClient_GetWaitingSendMessageCount=_HP_UdpArqClient_GetWaitingSendMessageCount@8")
+#endif
+
 	#pragma comment(linker, "/EXPORT:SYS_Base64Decode=_SYS_Base64Decode@16")
 	#pragma comment(linker, "/EXPORT:SYS_Base64Encode=_SYS_Base64Encode@16")
 	#pragma comment(linker, "/EXPORT:SYS_CodePageToUnicode=_SYS_CodePageToUnicode@16")
@@ -323,6 +397,7 @@
 	#pragma comment(linker, "/EXPORT:SYS_SSO_NoDelay=_SYS_SSO_NoDelay@8")
 	#pragma comment(linker, "/EXPORT:SYS_SSO_RecvBuffSize=_SYS_SSO_RecvBuffSize@8")
 	#pragma comment(linker, "/EXPORT:SYS_SSO_ReuseAddress=_SYS_SSO_ReuseAddress@8")
+	#pragma comment(linker, "/EXPORT:SYS_SSO_ExclusiveAddressUse=_SYS_SSO_ExclusiveAddressUse@8")
 	#pragma comment(linker, "/EXPORT:SYS_SSO_SendBuffSize=_SYS_SSO_SendBuffSize@8")
 	#pragma comment(linker, "/EXPORT:SYS_SetSocketOption=_SYS_SetSocketOption@20")
 	#pragma comment(linker, "/EXPORT:SYS_UnicodeToCodePage=_SYS_UnicodeToCodePage@16")
@@ -334,6 +409,9 @@
 	#pragma comment(linker, "/EXPORT:SYS_Utf8ToUnicode=_SYS_Utf8ToUnicode@12")
 	#pragma comment(linker, "/EXPORT:SYS_WSAGetLastError=_SYS_WSAGetLastError@0")
 	#pragma comment(linker, "/EXPORT:SYS_WSAIoctl=_SYS_WSAIoctl@28")
+	#pragma comment(linker, "/EXPORT:SYS_Malloc=_SYS_Malloc@4")
+	#pragma comment(linker, "/EXPORT:SYS_Realloc=_SYS_Realloc@8")
+	#pragma comment(linker, "/EXPORT:SYS_Free=_SYS_Free@4")
 
 #ifdef _ZLIB_SUPPORT
 	#pragma comment(linker, "/EXPORT:SYS_Compress=_SYS_Compress@16")
@@ -385,6 +463,7 @@
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendGet=_HP_HttpAgent_SendGet@20")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendHead=_HP_HttpAgent_SendHead@20")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendLocalFile=_HP_HttpAgent_SendLocalFile@28")
+	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendChunkData=_HP_HttpAgent_SendChunkData@20")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendOptions=_HP_HttpAgent_SendOptions@20")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendPatch=_HP_HttpAgent_SendPatch@28")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendPost=_HP_HttpAgent_SendPost@28")
@@ -394,6 +473,9 @@
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SendWSMessage=_HP_HttpAgent_SendWSMessage@40")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SetLocalVersion=_HP_HttpAgent_SetLocalVersion@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SetUseCookie=_HP_HttpAgent_SetUseCookie@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpAgent_StartHttp=_HP_HttpAgent_StartHttp@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpAgent_SetHttpAutoStart=_HP_HttpAgent_SetHttpAutoStart@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpAgent_IsHttpAutoStart=_HP_HttpAgent_IsHttpAutoStart@4")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_GetAllCookies=_HP_HttpClient_GetAllCookies@12")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_GetAllHeaderNames=_HP_HttpClient_GetAllHeaderNames@12")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_GetAllHeaders=_HP_HttpClient_GetAllHeaders@12")
@@ -418,6 +500,7 @@
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendGet=_HP_HttpClient_SendGet@16")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendHead=_HP_HttpClient_SendHead@16")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendLocalFile=_HP_HttpClient_SendLocalFile@24")
+	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendChunkData=_HP_HttpClient_SendChunkData@16")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendOptions=_HP_HttpClient_SendOptions@16")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendPatch=_HP_HttpClient_SendPatch@24")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendPost=_HP_HttpClient_SendPost@24")
@@ -427,6 +510,9 @@
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SendWSMessage=_HP_HttpClient_SendWSMessage@36")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SetLocalVersion=_HP_HttpClient_SetLocalVersion@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpClient_SetUseCookie=_HP_HttpClient_SetUseCookie@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpClient_StartHttp=_HP_HttpClient_StartHttp@4")
+	#pragma comment(linker, "/EXPORT:HP_HttpClient_SetHttpAutoStart=_HP_HttpClient_SetHttpAutoStart@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpClient_IsHttpAutoStart=_HP_HttpClient_IsHttpAutoStart@4")
 	#pragma comment(linker, "/EXPORT:HP_HttpCookie_HLP_CurrentUTCTime=_HP_HttpCookie_HLP_CurrentUTCTime@0")
 	#pragma comment(linker, "/EXPORT:HP_HttpCookie_HLP_ExpiresToMaxAge=_HP_HttpCookie_HLP_ExpiresToMaxAge@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpCookie_HLP_MakeExpiresStr=_HP_HttpCookie_HLP_MakeExpiresStr@16")
@@ -465,10 +551,14 @@
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_IsUpgrade=_HP_HttpServer_IsUpgrade@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_Release=_HP_HttpServer_Release@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_SendLocalFile=_HP_HttpServer_SendLocalFile@28")
+	#pragma comment(linker, "/EXPORT:HP_HttpServer_SendChunkData=_HP_HttpServer_SendChunkData@20")
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_SendResponse=_HP_HttpServer_SendResponse@32")
-	#pragma comment(linker, "/EXPORT:HP_HttpServer_SendWSMessage=_HP_HttpServer_SendWSMessage@40")
+	#pragma comment(linker, "/EXPORT:HP_HttpServer_SendWSMessage=_HP_HttpServer_SendWSMessage@36")
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_SetLocalVersion=_HP_HttpServer_SetLocalVersion@8")
 	#pragma comment(linker, "/EXPORT:HP_HttpServer_SetReleaseDelay=_HP_HttpServer_SetReleaseDelay@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpServer_StartHttp=_HP_HttpServer_StartHttp@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpServer_SetHttpAutoStart=_HP_HttpServer_SetHttpAutoStart@8")
+	#pragma comment(linker, "/EXPORT:HP_HttpServer_IsHttpAutoStart=_HP_HttpServer_IsHttpAutoStart@4")
 	#pragma comment(linker, "/EXPORT:HP_HttpSyncClient_CleanupRequestResult=_HP_HttpSyncClient_CleanupRequestResult@4")
 	#pragma comment(linker, "/EXPORT:HP_HttpSyncClient_GetConnectTimeout=_HP_HttpSyncClient_GetConnectTimeout@4")
 	#pragma comment(linker, "/EXPORT:HP_HttpSyncClient_GetRequestTimeout=_HP_HttpSyncClient_GetRequestTimeout@4")
@@ -537,6 +627,22 @@
 	#pragma comment(linker, "/EXPORT:HP_Set_FN_HttpServer_OnWSMessageHeader=_HP_Set_FN_HttpServer_OnWSMessageHeader@8")
 #endif
 
+	#pragma comment(linker, "/EXPORT:Create_HP_ThreadPool=_Create_HP_ThreadPool@0")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_ThreadPool=_Destroy_HP_ThreadPool@4")
+	#pragma comment(linker, "/EXPORT:Create_HP_SocketTaskObj=_Create_HP_SocketTaskObj@32")
+	#pragma comment(linker, "/EXPORT:Destroy_HP_SocketTaskObj=_Destroy_HP_SocketTaskObj@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_Start=_HP_ThreadPool_Start@20")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_Stop=_HP_ThreadPool_Stop@8")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_Submit=_HP_ThreadPool_Submit@16")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_Submit_Task=_HP_ThreadPool_Submit_Task@12")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_AdjustThreadCount=_HP_ThreadPool_AdjustThreadCount@8")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_HasStarted=_HP_ThreadPool_HasStarted@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_GetState=_HP_ThreadPool_GetState@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_GetQueueSize=_HP_ThreadPool_GetQueueSize@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_GetThreadCount=_HP_ThreadPool_GetThreadCount@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_GetMaxQueueSize=_HP_ThreadPool_GetMaxQueueSize@4")
+	#pragma comment(linker, "/EXPORT:HP_ThreadPool_GetRejectedPolicy=_HP_ThreadPool_GetRejectedPolicy@4")
+
 #endif
 
 /*****************************************************************************************************************************************************/
@@ -555,9 +661,16 @@ typedef C_HP_ObjectT<CTcpClient, ITcpClientListener>							C_HP_TcpClient;
 typedef C_HP_ObjectT<CTcpPullClient, ITcpClientListener, sizeof(IPullClient)>	C_HP_TcpPullClient;
 typedef C_HP_ObjectT<CTcpPackClient, ITcpClientListener, sizeof(IPackClient)>	C_HP_TcpPackClient;
 
+#ifdef _UDP_SUPPORT
+
 typedef C_HP_ObjectT<CUdpServer, IUdpServerListener>							C_HP_UdpServer;
 typedef C_HP_ObjectT<CUdpClient, IUdpClientListener>							C_HP_UdpClient;
 typedef C_HP_ObjectT<CUdpCast, IUdpCastListener>								C_HP_UdpCast;
+
+typedef C_HP_ObjectT<CUdpArqServer, IUdpServerListener, sizeof(IArqSocket)>		C_HP_UdpArqServer;
+typedef C_HP_ObjectT<CUdpArqClient, IUdpClientListener, sizeof(IArqClient)>		C_HP_UdpArqClient;
+
+#endif
 
 /****************************************************/
 /**************** TCP/UDP 对象创建函数 ***************/
@@ -607,21 +720,6 @@ HPSOCKET_API HP_TcpPackClient __HP_CALL Create_HP_TcpPackClient(HP_TcpClientList
 	return (HP_TcpPackClient)(new C_HP_TcpPackClient((ITcpClientListener*)pListener));
 }
 
-HPSOCKET_API HP_UdpServer __HP_CALL Create_HP_UdpServer(HP_UdpServerListener pListener)
-{
-	return (HP_UdpServer)(new C_HP_UdpServer((IUdpServerListener*)pListener));
-}
-
-HPSOCKET_API HP_UdpClient __HP_CALL Create_HP_UdpClient(HP_UdpClientListener pListener)
-{
-	return (HP_UdpClient)(new C_HP_UdpClient((IUdpClientListener*)pListener));
-}
-
-HPSOCKET_API HP_UdpCast __HP_CALL Create_HP_UdpCast(HP_UdpCastListener pListener)
-{
-	return (HP_UdpCast)(new C_HP_UdpCast((IUdpCastListener*)pListener));
-}
-
 HPSOCKET_API void __HP_CALL Destroy_HP_TcpServer(HP_TcpServer pServer)
 {
 	delete (C_HP_TcpServer*)pServer;
@@ -665,21 +763,6 @@ HPSOCKET_API void __HP_CALL Destroy_HP_TcpPackAgent(HP_TcpPackAgent pAgent)
 HPSOCKET_API void __HP_CALL Destroy_HP_TcpPackClient(HP_TcpPackClient pClient)
 {
 	delete (C_HP_TcpPackClient*)pClient;
-}
-
-HPSOCKET_API void __HP_CALL Destroy_HP_UdpServer(HP_UdpServer pServer)
-{
-	delete (C_HP_UdpServer*)pServer;
-}
-
-HPSOCKET_API void __HP_CALL Destroy_HP_UdpClient(HP_UdpClient pClient)
-{
-	delete (C_HP_UdpClient*)pClient;
-}
-
-HPSOCKET_API void __HP_CALL Destroy_HP_UdpCast(HP_UdpCast pCast)
-{
-	delete (C_HP_UdpCast*)pCast;
 }
 
 HPSOCKET_API HP_TcpServerListener __HP_CALL Create_HP_TcpServerListener()
@@ -727,21 +810,6 @@ HPSOCKET_API HP_TcpPackClientListener __HP_CALL Create_HP_TcpPackClientListener(
 	return (HP_TcpPackClientListener)(new C_HP_TcpPackClientListener);
 }
 
-HPSOCKET_API HP_UdpServerListener __HP_CALL Create_HP_UdpServerListener()
-{
-	return (HP_UdpServerListener)(new C_HP_UdpServerListener);
-}
-
-HPSOCKET_API HP_UdpClientListener __HP_CALL Create_HP_UdpClientListener()
-{
-	return (HP_UdpClientListener)(new C_HP_UdpClientListener);
-}
-
-HPSOCKET_API HP_UdpCastListener __HP_CALL Create_HP_UdpCastListener()
-{
-	return (HP_UdpCastListener)(new C_HP_UdpCastListener);
-}
-
 HPSOCKET_API void __HP_CALL Destroy_HP_TcpServerListener(HP_TcpServerListener pListener)
 {
 	delete (C_HP_TcpServerListener*)pListener;
@@ -787,6 +855,83 @@ HPSOCKET_API void __HP_CALL Destroy_HP_TcpPackClientListener(HP_TcpPackClientLis
 	delete (C_HP_TcpPackClientListener*)pListener;
 }
 
+#ifdef _UDP_SUPPORT
+
+HPSOCKET_API HP_UdpServer __HP_CALL Create_HP_UdpServer(HP_UdpServerListener pListener)
+{
+	return (HP_UdpServer)(new C_HP_UdpServer((IUdpServerListener*)pListener));
+}
+
+HPSOCKET_API HP_UdpClient __HP_CALL Create_HP_UdpClient(HP_UdpClientListener pListener)
+{
+	return (HP_UdpClient)(new C_HP_UdpClient((IUdpClientListener*)pListener));
+}
+
+HPSOCKET_API HP_UdpCast __HP_CALL Create_HP_UdpCast(HP_UdpCastListener pListener)
+{
+	return (HP_UdpCast)(new C_HP_UdpCast((IUdpCastListener*)pListener));
+}
+
+HPSOCKET_API HP_UdpArqServer __HP_CALL Create_HP_UdpArqServer(HP_UdpServerListener pListener)
+{
+	return (HP_UdpArqServer)(new C_HP_UdpArqServer((IUdpServerListener*)pListener));
+}
+
+HPSOCKET_API HP_UdpArqClient __HP_CALL Create_HP_UdpArqClient(HP_UdpClientListener pListener)
+{
+	return (HP_UdpArqClient)(new C_HP_UdpArqClient((IUdpClientListener*)pListener));
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpServer(HP_UdpServer pServer)
+{
+	delete (C_HP_UdpServer*)pServer;
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpClient(HP_UdpClient pClient)
+{
+	delete (C_HP_UdpClient*)pClient;
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpCast(HP_UdpCast pCast)
+{
+	delete (C_HP_UdpCast*)pCast;
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpArqServer(HP_UdpArqServer pServer)
+{
+	delete (C_HP_UdpArqServer*)pServer;
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpArqClient(HP_UdpArqClient pClient)
+{
+	delete (C_HP_UdpArqClient*)pClient;
+}
+
+HPSOCKET_API HP_UdpServerListener __HP_CALL Create_HP_UdpServerListener()
+{
+	return (HP_UdpServerListener)(new C_HP_UdpServerListener);
+}
+
+HPSOCKET_API HP_UdpClientListener __HP_CALL Create_HP_UdpClientListener()
+{
+	return (HP_UdpClientListener)(new C_HP_UdpClientListener);
+}
+
+HPSOCKET_API HP_UdpCastListener __HP_CALL Create_HP_UdpCastListener()
+{
+	return (HP_UdpCastListener)(new C_HP_UdpCastListener);
+}
+
+HPSOCKET_API HP_UdpArqServerListener __HP_CALL Create_HP_UdpArqServerListener()
+{
+	return (HP_UdpArqServerListener)(new C_HP_UdpArqServerListener);
+}
+
+HPSOCKET_API HP_UdpArqClientListener __HP_CALL Create_HP_UdpArqClientListener()
+{
+	return (HP_UdpArqClientListener)(new C_HP_UdpArqClientListener);
+}
+
 HPSOCKET_API void __HP_CALL Destroy_HP_UdpServerListener(HP_UdpServerListener pListener)
 {
 	delete (C_HP_UdpServerListener*)pListener;
@@ -801,6 +946,18 @@ HPSOCKET_API void __HP_CALL Destroy_HP_UdpCastListener(HP_UdpCastListener pListe
 {
 	delete (C_HP_UdpClientListener*)pListener;
 }
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpArqServerListener(HP_UdpArqServerListener pListener)
+{
+	delete (C_HP_UdpArqServerListener*)pListener;
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_UdpArqClientListener(HP_UdpArqClientListener pListener)
+{
+	delete (C_HP_UdpArqClientListener*)pListener;
+}
+
+#endif
 
 /**********************************************************************************/
 /***************************** Server 回调函数设置方法 *****************************/
@@ -1022,6 +1179,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Server_IsPauseReceive(HP_Server pServer, HP_CONNI
 	return C_HP_Object::ToSecond<IServer>(pServer)->IsPauseReceive(dwConnID, *pbPaused);
 }
 
+HPSOCKET_API BOOL __HP_CALL HP_Server_IsConnected(HP_Server pServer, HP_CONNID dwConnID)
+{
+	return C_HP_Object::ToSecond<IServer>(pServer)->IsConnected(dwConnID);
+}
+
 HPSOCKET_API DWORD __HP_CALL HP_Server_GetConnectionCount(HP_Server pServer)
 {
 	return C_HP_Object::ToSecond<IServer>(pServer)->GetConnectionCount();
@@ -1060,6 +1222,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Server_GetRemoteAddress(HP_Server pServer, HP_CON
 HPSOCKET_API void __HP_CALL HP_Server_SetSendPolicy(HP_Server pServer, En_HP_SendPolicy enSendPolicy)
 {
 	C_HP_Object::ToSecond<IServer>(pServer)->SetSendPolicy(enSendPolicy);
+}
+
+HPSOCKET_API void __HP_CALL HP_Server_SetOnSendSyncPolicy(HP_Server pServer, En_HP_OnSendSyncPolicy enSyncPolicy)
+{
+	C_HP_Object::ToSecond<IServer>(pServer)->SetOnSendSyncPolicy(enSyncPolicy);
 }
 
 HPSOCKET_API void __HP_CALL HP_Server_SetFreeSocketObjLockTime(HP_Server pServer, DWORD dwFreeSocketObjLockTime)
@@ -1105,6 +1272,11 @@ HPSOCKET_API void __HP_CALL HP_Server_SetMarkSilence(HP_Server pServer, BOOL bMa
 HPSOCKET_API En_HP_SendPolicy __HP_CALL HP_Server_GetSendPolicy(HP_Server pServer)
 {
 	return C_HP_Object::ToSecond<IServer>(pServer)->GetSendPolicy();
+}
+
+HPSOCKET_API En_HP_OnSendSyncPolicy __HP_CALL HP_Server_GetOnSendSyncPolicy(HP_Server pServer)
+{
+	return C_HP_Object::ToSecond<IServer>(pServer)->GetOnSendSyncPolicy();
 }
 
 HPSOCKET_API DWORD __HP_CALL HP_Server_GetFreeSocketObjLockTime(HP_Server pServer)
@@ -1208,6 +1380,8 @@ HPSOCKET_API DWORD __HP_CALL HP_TcpServer_GetKeepAliveInterval(HP_TcpServer pSer
 	return C_HP_Object::ToSecond<ITcpServer>(pServer)->GetKeepAliveInterval();
 }
 
+#ifdef _UDP_SUPPORT
+
 /**********************************************************************************/
 /***************************** UDP Server 属性访问方法 *****************************/
 
@@ -1251,6 +1425,116 @@ HPSOCKET_API DWORD __HP_CALL HP_UdpServer_GetDetectInterval(HP_UdpServer pServer
 	return C_HP_Object::ToSecond<IUdpServer>(pServer)->GetDetectInterval();
 }
 
+/**********************************************************************************/
+/*************************** UDP ARQ Server 属性访问方法 ***************************/
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetNoDelay(HP_UdpArqServer pServer, BOOL bNoDelay)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetNoDelay(bNoDelay);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetTurnoffCongestCtrl(HP_UdpArqServer pServer, BOOL bTurnOff)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetTurnoffCongestCtrl(bTurnOff);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetFlushInterval(HP_UdpArqServer pServer, DWORD dwFlushInterval)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetFlushInterval(dwFlushInterval);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetResendByAcks(HP_UdpArqServer pServer, DWORD dwResendByAcks)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetResendByAcks(dwResendByAcks);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetSendWndSize(HP_UdpArqServer pServer, DWORD dwSendWndSize)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetSendWndSize(dwSendWndSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetRecvWndSize(HP_UdpArqServer pServer, DWORD dwRecvWndSize)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetRecvWndSize(dwRecvWndSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetMinRto(HP_UdpArqServer pServer, DWORD dwMinRto)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetMinRto(dwMinRto);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetMaxTransUnit(HP_UdpArqServer pServer, DWORD dwMaxTransUnit)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetMaxTransUnit(dwMaxTransUnit);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetMaxMessageSize(HP_UdpArqServer pServer, DWORD dwMaxMessageSize)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetMaxMessageSize(dwMaxMessageSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqServer_SetHandShakeTimeout(HP_UdpArqServer pServer, DWORD dwHandShakeTimeout)
+{
+	C_HP_Object::ToFirst<IArqSocket>(pServer)->SetHandShakeTimeout(dwHandShakeTimeout);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqServer_IsNoDelay(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->IsNoDelay();
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqServer_IsTurnoffCongestCtrl(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->IsTurnoffCongestCtrl();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetFlushInterval(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetFlushInterval();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetResendByAcks(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetResendByAcks();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetSendWndSize(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetSendWndSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetRecvWndSize(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetRecvWndSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetMinRto(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetMinRto();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetMaxTransUnit(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetMaxTransUnit();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetMaxMessageSize(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetMaxMessageSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqServer_GetHandShakeTimeout(HP_UdpArqServer pServer)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetHandShakeTimeout();
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqServer_GetWaitingSendMessageCount(HP_UdpArqServer pServer, HP_CONNID dwConnID, int* piCount)
+{
+	return C_HP_Object::ToFirst<IArqSocket>(pServer)->GetWaitingSendMessageCount(dwConnID, *piCount);
+}
+
+#endif
+
 /**************************************************************************/
 /***************************** Agent 操作方法 *****************************/
 
@@ -1272,6 +1556,26 @@ HPSOCKET_API BOOL __HP_CALL HP_Agent_Connect(HP_Agent pAgent, LPCTSTR lpszRemote
 HPSOCKET_API BOOL __HP_CALL HP_Agent_ConnectWithExtra(HP_Agent pAgent, LPCTSTR lpszRemoteAddress, USHORT usPort, HP_CONNID* pdwConnID, PVOID pExtra)
 {
 	return C_HP_Object::ToSecond<IAgent>(pAgent)->Connect(lpszRemoteAddress, usPort, pdwConnID, pExtra);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_Agent_ConnectWithLocalPort(HP_Agent pAgent, LPCTSTR lpszRemoteAddress, USHORT usPort, HP_CONNID* pdwConnID, USHORT usLocalPort)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->Connect(lpszRemoteAddress, usPort, pdwConnID, nullptr, usLocalPort);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_Agent_ConnectWithLocalAddress(HP_Agent pAgent, LPCTSTR lpszRemoteAddress, USHORT usPort, HP_CONNID* pdwConnID, LPCTSTR lpszLocalAddress)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->Connect(lpszRemoteAddress, usPort, pdwConnID, nullptr, 0, lpszLocalAddress);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_Agent_ConnectWithExtraAndLocalPort(HP_Agent pAgent, LPCTSTR lpszRemoteAddress, USHORT usPort, HP_CONNID* pdwConnID, PVOID pExtra, USHORT usLocalPort)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->Connect(lpszRemoteAddress, usPort, pdwConnID, pExtra, usLocalPort);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_Agent_ConnectWithExtraAndLocalAddressPort(HP_Agent pAgent, LPCTSTR lpszRemoteAddress, USHORT usPort, HP_CONNID* pdwConnID, PVOID pExtra, USHORT usLocalPort, LPCTSTR lpszLocalAddress)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->Connect(lpszRemoteAddress, usPort, pdwConnID, pExtra, usLocalPort, lpszLocalAddress);
 }
 
 HPSOCKET_API BOOL __HP_CALL HP_Agent_Send(HP_Agent pAgent, HP_CONNID dwConnID, const BYTE* pBuffer, int iLength)
@@ -1357,6 +1661,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Agent_IsPauseReceive(HP_Agent pAgent, HP_CONNID d
 	return C_HP_Object::ToSecond<IAgent>(pAgent)->IsPauseReceive(dwConnID, *pbPaused);
 }
 
+HPSOCKET_API BOOL __HP_CALL HP_Agent_IsConnected(HP_Agent pAgent, HP_CONNID dwConnID)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->IsConnected(dwConnID);
+}
+
 HPSOCKET_API DWORD __HP_CALL HP_Agent_GetConnectionCount(HP_Agent pAgent)
 {
 	return C_HP_Object::ToSecond<IAgent>(pAgent)->GetConnectionCount();
@@ -1395,6 +1704,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Agent_GetRemoteHost(HP_Agent pAgent, HP_CONNID dw
 HPSOCKET_API void __HP_CALL HP_Agent_SetSendPolicy(HP_Agent pAgent, En_HP_SendPolicy enSendPolicy)
 {
 	C_HP_Object::ToSecond<IAgent>(pAgent)->SetSendPolicy(enSendPolicy);
+}
+
+HPSOCKET_API void __HP_CALL HP_Agent_SetOnSendSyncPolicy(HP_Agent pAgent, En_HP_OnSendSyncPolicy enSyncPolicy)
+{
+	C_HP_Object::ToSecond<IAgent>(pAgent)->SetOnSendSyncPolicy(enSyncPolicy);
 }
 
 HPSOCKET_API void __HP_CALL HP_Agent_SetFreeSocketObjLockTime(HP_Agent pAgent, DWORD dwFreeSocketObjLockTime)
@@ -1440,6 +1754,11 @@ HPSOCKET_API void __HP_CALL HP_Agent_SetMarkSilence(HP_Agent pAgent, BOOL bMarkS
 HPSOCKET_API En_HP_SendPolicy __HP_CALL HP_Agent_GetSendPolicy(HP_Agent pAgent)
 {
 	return C_HP_Object::ToSecond<IAgent>(pAgent)->GetSendPolicy();
+}
+
+HPSOCKET_API En_HP_OnSendSyncPolicy __HP_CALL HP_Agent_GetOnSendSyncPolicy(HP_Agent pAgent)
+{
+	return C_HP_Object::ToSecond<IAgent>(pAgent)->GetOnSendSyncPolicy();
 }
 
 HPSOCKET_API DWORD __HP_CALL HP_Agent_GetFreeSocketObjLockTime(HP_Agent pAgent)
@@ -1546,6 +1865,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Client_StartWithBindAddress(HP_Client pClient, LP
 	return C_HP_Object::ToSecond<IClient>(pClient)->Start(lpszRemoteAddress, usPort, bAsyncConnect, lpszBindAddress);
 }
 
+HPSOCKET_API BOOL __HP_CALL HP_Client_StartWithBindAddressAndLocalPort(HP_Client pClient, LPCTSTR lpszRemoteAddress, USHORT usPort, BOOL bAsyncConnect, LPCTSTR lpszBindAddress, USHORT usLocalPort)
+{
+	return C_HP_Object::ToSecond<IClient>(pClient)->Start(lpszRemoteAddress, usPort, bAsyncConnect, lpszBindAddress, usLocalPort);
+}
+
 HPSOCKET_API BOOL __HP_CALL HP_Client_Stop(HP_Client pClient)
 {
 	return C_HP_Object::ToSecond<IClient>(pClient)->Stop();
@@ -1634,6 +1958,11 @@ HPSOCKET_API BOOL __HP_CALL HP_Client_IsPauseReceive(HP_Client pClient, BOOL* pb
 	return C_HP_Object::ToSecond<IClient>(pClient)->IsPauseReceive(*pbPaused);
 }
 
+HPSOCKET_API BOOL __HP_CALL HP_Client_IsConnected(HP_Client pClient)
+{
+	return C_HP_Object::ToSecond<IClient>(pClient)->IsConnected();
+}
+
 HPSOCKET_API void __HP_CALL HP_Client_SetFreeBufferPoolSize(HP_Client pClient, DWORD dwFreeBufferPoolSize)
 {
 	C_HP_Object::ToSecond<IClient>(pClient)->SetFreeBufferPoolSize(dwFreeBufferPoolSize);
@@ -1695,6 +2024,8 @@ HPSOCKET_API DWORD __HP_CALL HP_TcpClient_GetKeepAliveInterval(HP_TcpClient pCli
 	return C_HP_Object::ToSecond<ITcpClient>(pClient)->GetKeepAliveInterval();
 }
 
+#ifdef _UDP_SUPPORT
+
 /**********************************************************************************/
 /***************************** UDP Client 属性访问方法 *****************************/
 
@@ -1726,6 +2057,114 @@ HPSOCKET_API DWORD __HP_CALL HP_UdpClient_GetDetectAttempts(HP_UdpClient pClient
 HPSOCKET_API DWORD __HP_CALL HP_UdpClient_GetDetectInterval(HP_UdpClient pClient)
 {
 	return C_HP_Object::ToSecond<IUdpClient>(pClient)->GetDetectInterval();
+}
+
+/**********************************************************************************/
+/*************************** UDP ARQ Client 属性访问方法 ***************************/
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetNoDelay(HP_UdpArqClient pClient, BOOL bNoDelay)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetNoDelay(bNoDelay);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetTurnoffCongestCtrl(HP_UdpArqClient pClient, BOOL bTurnOff)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetTurnoffCongestCtrl(bTurnOff);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetFlushInterval(HP_UdpArqClient pClient, DWORD dwFlushInterval)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetFlushInterval(dwFlushInterval);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetResendByAcks(HP_UdpArqClient pClient, DWORD dwResendByAcks)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetResendByAcks(dwResendByAcks);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetSendWndSize(HP_UdpArqClient pClient, DWORD dwSendWndSize)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetSendWndSize(dwSendWndSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetRecvWndSize(HP_UdpArqClient pClient, DWORD dwRecvWndSize)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetRecvWndSize(dwRecvWndSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetMinRto(HP_UdpArqClient pClient, DWORD dwMinRto)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetMinRto(dwMinRto);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetMaxTransUnit(HP_UdpArqClient pClient, DWORD dwMaxTransUnit)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetMaxTransUnit(dwMaxTransUnit);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetMaxMessageSize(HP_UdpArqClient pClient, DWORD dwMaxMessageSize)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetMaxMessageSize(dwMaxMessageSize);
+}
+
+HPSOCKET_API void __HP_CALL HP_UdpArqClient_SetHandShakeTimeout(HP_UdpArqClient pClient, DWORD dwHandShakeTimeout)
+{
+	C_HP_Object::ToFirst<IArqClient>(pClient)->SetHandShakeTimeout(dwHandShakeTimeout);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqClient_IsNoDelay(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->IsNoDelay();
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqClient_IsTurnoffCongestCtrl(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->IsTurnoffCongestCtrl();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetFlushInterval(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetFlushInterval();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetResendByAcks(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetResendByAcks();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetSendWndSize(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetSendWndSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetRecvWndSize(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetRecvWndSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetMinRto(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetMinRto();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetMaxTransUnit(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetMaxTransUnit();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetMaxMessageSize(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetMaxMessageSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_UdpArqClient_GetHandShakeTimeout(HP_UdpArqClient pClient)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetHandShakeTimeout();
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_UdpArqClient_GetWaitingSendMessageCount(HP_UdpArqClient pClient, int* piCount)
+{
+	return C_HP_Object::ToFirst<IArqClient>(pClient)->GetWaitingSendMessageCount(*piCount);
 }
 
 /**********************************************************************************/
@@ -1785,6 +2224,8 @@ HPSOCKET_API BOOL __HP_CALL HP_UdpCast_IsMultiCastLoop(HP_UdpCast pCast)
 {
 	return C_HP_Object::ToSecond<IUdpCast>(pCast)->IsMultiCastLoop();
 }
+
+#endif
 
 /***************************************************************************************/
 /***************************** TCP Pull Server 组件操作方法 *****************************/
@@ -1986,6 +2427,11 @@ HPSOCKET_API int __HP_CALL SYS_SSO_ReuseAddress(SOCKET sock, BOOL bReuse)
 	return ::SSO_ReuseAddress(sock, bReuse);
 }
 
+HPSOCKET_API int __HP_CALL SYS_SSO_ExclusiveAddressUse(SOCKET sock, BOOL bExclusive)
+{
+	return ::SSO_ExclusiveAddressUse(sock, bExclusive);
+}
+
 HPSOCKET_API BOOL __HP_CALL SYS_GetSocketLocalAddress(SOCKET socket, TCHAR lpszAddress[], int* piAddressLen, USHORT* pusPort)
 {
 	return ::GetSocketLocalAddress(socket, lpszAddress, *piAddressLen, *pusPort);
@@ -2024,6 +2470,21 @@ HPSOCKET_API ULONGLONG __HP_CALL SYS_NToH64(ULONGLONG value)
 HPSOCKET_API ULONGLONG __HP_CALL SYS_HToN64(ULONGLONG value)
 {
 	return ::HToN64(value);
+}
+
+HPSOCKET_API LPBYTE __HP_CALL SYS_Malloc(int size)
+{
+	return MALLOC(BYTE, size);
+}
+
+HPSOCKET_API LPBYTE __HP_CALL SYS_Realloc(LPBYTE p, int size)
+{
+	return REALLOC(p, BYTE, size);
+}
+
+HPSOCKET_API VOID __HP_CALL SYS_Free(LPBYTE p)
+{
+	FREE(p);
 }
 
 HPSOCKET_API BOOL __HP_CALL SYS_CodePageToUnicode(int iCodePage, const char szSrc[], WCHAR szDest[], int* piDestLength)
@@ -2551,14 +3012,24 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpServer_SendLocalFile(HP_HttpServer pServer, H
 	return C_HP_Object::ToFirst<IHttpServer>(pServer)->SendLocalFile(dwConnID, lpszFileName, usStatusCode, lpszDesc, lpHeaders, iHeaderCount);
 }
 
-HPSOCKET_API BOOL __HP_CALL HP_HttpServer_SendWSMessage(HP_HttpServer pServer, HP_CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+HPSOCKET_API BOOL __HP_CALL HP_HttpServer_SendChunkData(HP_HttpServer pServer, HP_CONNID dwConnID, const BYTE* pData, int iLength, LPCSTR lpszExtensions)
 {
-	return C_HP_Object::ToFirst<IHttpServer>(pServer)->SendWSMessage(dwConnID, bFinal, iReserved, iOperationCode, lpszMask, pData, iLength, ullBodyLen);
+	return C_HP_Object::ToFirst<IHttpServer>(pServer)->SendChunkData(dwConnID, pData, iLength, lpszExtensions);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpServer_SendWSMessage(HP_HttpServer pServer, HP_CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+{
+	return C_HP_Object::ToFirst<IHttpServer>(pServer)->SendWSMessage(dwConnID, bFinal, iReserved, iOperationCode, pData, iLength, ullBodyLen);
 }
 
 HPSOCKET_API BOOL __HP_CALL HP_HttpServer_Release(HP_HttpServer pServer, HP_CONNID dwConnID)
 {
 	return C_HP_Object::ToFirst<IHttpServer>(pServer)->Release(dwConnID);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpServer_StartHttp(HP_HttpServer pServer, HP_CONNID dwConnID)
+{
+	return C_HP_Object::ToFirst<IHttpServer>(pServer)->StartHttp(dwConnID);
 }
 
 /******************************************************************************/
@@ -2685,6 +3156,16 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpServer_GetWSMessageState(HP_HttpServer pServe
 	return C_HP_Object::ToFirst<IHttpServer>(pServer)->GetWSMessageState(dwConnID, lpbFinal, lpiReserved, lpiOperationCode, lpszMask, lpullBodyLen, lpullBodyRemain);
 }
 
+HPSOCKET_API void __HP_CALL HP_HttpServer_SetHttpAutoStart(HP_HttpServer pServer, BOOL bAutoStart)
+{
+	C_HP_Object::ToFirst<IHttpServer>(pServer)->SetHttpAutoStart(bAutoStart);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpServer_IsHttpAutoStart(HP_HttpServer pServer)
+{
+	return C_HP_Object::ToFirst<IHttpServer>(pServer)->IsHttpAutoStart();
+}
+
 /**************************************************************************/
 /*************************** HTTP Agent 操作方法 ***************************/
 
@@ -2696,6 +3177,11 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendRequest(HP_HttpAgent pAgent, HP_CON
 HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendLocalFile(HP_HttpAgent pAgent, HP_CONNID dwConnID, LPCSTR lpszFileName, LPCSTR lpszMethod, LPCSTR lpszPath, const HP_THeader lpHeaders[], int iHeaderCount)
 {
 	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->SendLocalFile(dwConnID, lpszFileName, lpszMethod, lpszPath, lpHeaders, iHeaderCount);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendChunkData(HP_HttpAgent pAgent, HP_CONNID dwConnID, const BYTE* pData, int iLength, LPCSTR lpszExtensions)
+{
+	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->SendChunkData(dwConnID, pData, iLength, lpszExtensions);
 }
 
 HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendPost(HP_HttpAgent pAgent, HP_CONNID dwConnID, LPCSTR lpszPath, const HP_THeader lpHeaders[], int iHeaderCount, const BYTE* pBody, int iLength)
@@ -2743,9 +3229,14 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendConnect(HP_HttpAgent pAgent, HP_CON
 	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->SendConnect(dwConnID, lpszHost, lpHeaders, iHeaderCount);
 }
 
-HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendWSMessage(HP_HttpAgent pAgent, HP_CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_SendWSMessage(HP_HttpAgent pAgent, HP_CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], const BYTE* pData, int iLength, ULONGLONG ullBodyLen)
 {
 	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->SendWSMessage(dwConnID, bFinal, iReserved, iOperationCode, lpszMask, pData, iLength, ullBodyLen);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_StartHttp(HP_HttpAgent pAgent, HP_CONNID dwConnID)
+{
+	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->StartHttp(dwConnID);
 }
 
 /******************************************************************************/
@@ -2856,6 +3347,16 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_GetWSMessageState(HP_HttpAgent pAgent, 
 	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->GetWSMessageState(dwConnID, lpbFinal, lpiReserved, lpiOperationCode, lpszMask, lpullBodyLen, lpullBodyRemain);
 }
 
+HPSOCKET_API void __HP_CALL HP_HttpAgent_SetHttpAutoStart(HP_HttpAgent pAgent, BOOL bAutoStart)
+{
+	C_HP_Object::ToFirst<IHttpAgent>(pAgent)->SetHttpAutoStart(bAutoStart);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpAgent_IsHttpAutoStart(HP_HttpAgent pAgent)
+{
+	return C_HP_Object::ToFirst<IHttpAgent>(pAgent)->IsHttpAutoStart();
+}
+
 /**************************************************************************/
 /*************************** HTTP Client 操作方法 **************************/
 
@@ -2867,6 +3368,11 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendRequest(HP_HttpClient pClient, LPC
 HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendLocalFile(HP_HttpClient pClient, LPCSTR lpszFileName, LPCSTR lpszMethod, LPCSTR lpszPath, const HP_THeader lpHeaders[], int iHeaderCount)
 {
 	return C_HP_Object::ToFirst<IHttpClient>(pClient)->SendLocalFile(lpszFileName, lpszMethod, lpszPath, lpHeaders, iHeaderCount);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendChunkData(HP_HttpClient pClient, const BYTE* pData, int iLength, LPCSTR lpszExtensions)
+{
+	return C_HP_Object::ToFirst<IHttpClient>(pClient)->SendChunkData(pData, iLength, lpszExtensions);
 }
 
 HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendPost(HP_HttpClient pClient, LPCSTR lpszPath, const HP_THeader lpHeaders[], int iHeaderCount, const BYTE* pBody, int iLength)
@@ -2914,9 +3420,14 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendConnect(HP_HttpClient pClient, LPC
 	return C_HP_Object::ToFirst<IHttpClient>(pClient)->SendConnect(lpszHost, lpHeaders, iHeaderCount);
 }
 
-HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendWSMessage(HP_HttpClient pClient, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], BYTE* pData, int iLength, ULONGLONG ullBodyLen)
+HPSOCKET_API BOOL __HP_CALL HP_HttpClient_SendWSMessage(HP_HttpClient pClient, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], const BYTE* pData, int iLength, ULONGLONG ullBodyLen)
 {
 	return C_HP_Object::ToFirst<IHttpClient>(pClient)->SendWSMessage(bFinal, iReserved, iOperationCode, lpszMask, pData, iLength, ullBodyLen);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpClient_StartHttp(HP_HttpClient pClient)
+{
+	return C_HP_Object::ToFirst<IHttpClient>(pClient)->StartHttp();
 }
 
 /******************************************************************************/
@@ -3027,10 +3538,20 @@ HPSOCKET_API BOOL __HP_CALL HP_HttpClient_GetWSMessageState(HP_HttpClient pClien
 	return C_HP_Object::ToFirst<IHttpClient>(pClient)->GetWSMessageState(lpbFinal, lpiReserved, lpiOperationCode, lpszMask, lpullBodyLen, lpullBodyRemain);
 }
 
+HPSOCKET_API void __HP_CALL HP_HttpClient_SetHttpAutoStart(HP_HttpClient pClient, BOOL bAutoStart)
+{
+	C_HP_Object::ToFirst<IHttpClient>(pClient)->SetHttpAutoStart(bAutoStart);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_HttpClient_IsHttpAutoStart(HP_HttpClient pClient)
+{
+	return C_HP_Object::ToFirst<IHttpClient>(pClient)->IsHttpAutoStart();
+}
+
 /**************************************************************************/
 /************************ HTTP Sync Client 操作方法 ************************/
 
-HPSOCKET_API BOOL __HP_CALL HP_HttpSyncClient_OpenUrl(HP_HttpSyncClient pClient, LPCSTR lpszMethod, LPCSTR lpszUrl, const THeader lpHeaders[], int iHeaderCount, const BYTE* pBody, int iLength, BOOL bForceReconnect)
+HPSOCKET_API BOOL __HP_CALL HP_HttpSyncClient_OpenUrl(HP_HttpSyncClient pClient, LPCSTR lpszMethod, LPCSTR lpszUrl, const HP_THeader lpHeaders[], int iHeaderCount, const BYTE* pBody, int iLength, BOOL bForceReconnect)
 {
 	return C_HP_Object::ToFirst<IHttpSyncClient>(pClient)->OpenUrl(lpszMethod, lpszUrl, lpHeaders, iHeaderCount, pBody, iLength, bForceReconnect);
 }
@@ -3146,3 +3667,91 @@ HPSOCKET_API int __HP_CALL HP_HttpCookie_HLP_ExpiresToMaxAge(__time64_t tmExpire
 /*****************************************************************************************************************************************************/
 
 #endif
+
+/*****************************************************************************************************************************************************/
+/**************************************************************** Thread Pool Exports ****************************************************************/
+/*****************************************************************************************************************************************************/
+
+/****************************************************/
+/******************* 对象创建函数 ********************/
+
+HPSOCKET_API HP_ThreadPool __HP_CALL Create_HP_ThreadPool()
+{
+	return (HP_ThreadPool)(new CHPThreadPool);
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_ThreadPool(HP_ThreadPool pThreadPool)
+{
+	delete (IHPThreadPool*)pThreadPool;
+}
+
+HPSOCKET_API LPTSocketTask __HP_CALL Create_HP_SocketTaskObj(Fn_SocketTaskProc fnTaskProc, PVOID pSender, HP_CONNID dwConnID, LPCBYTE pBuffer, INT iBuffLen, En_HP_TaskBufferType enBuffType, WPARAM wParam, LPARAM lParam)
+{
+	return ::CreateSocketTaskObj(fnTaskProc, pSender, dwConnID, pBuffer, iBuffLen, enBuffType, wParam, lParam);
+}
+
+HPSOCKET_API void __HP_CALL Destroy_HP_SocketTaskObj(LPTSocketTask pTask)
+{
+	::DestroySocketTaskObj(pTask);
+}
+
+/***********************************************************************/
+/***************************** 组件操作方法 *****************************/
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_Start(HP_ThreadPool pThreadPool, DWORD dwThreadCount, DWORD dwMaxQueueSize, En_HP_RejectedPolicy enRejectedPolicy, DWORD dwStackSize)
+{
+	return ((IHPThreadPool*)pThreadPool)->Start(dwThreadCount, dwMaxQueueSize, enRejectedPolicy, dwStackSize);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_Stop(HP_ThreadPool pThreadPool, DWORD dwMaxWait)
+{
+	return ((IHPThreadPool*)pThreadPool)->Stop(dwMaxWait);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_Submit(HP_ThreadPool pThreadPool, HP_Fn_TaskProc fnTaskProc, PVOID pvArg, DWORD dwMaxWait)
+{
+	return ((IHPThreadPool*)pThreadPool)->Submit(fnTaskProc, pvArg, dwMaxWait);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_Submit_Task(HP_ThreadPool pThreadPool, HP_LPTSocketTask pTask, DWORD dwMaxWait)
+{
+	return ((IHPThreadPool*)pThreadPool)->Submit(pTask, dwMaxWait);
+}
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_AdjustThreadCount(HP_ThreadPool pThreadPool, DWORD dwNewThreadCount)
+{
+	return ((IHPThreadPool*)pThreadPool)->AdjustThreadCount(dwNewThreadCount);
+}
+
+/***********************************************************************/
+/***************************** 属性访问方法 *****************************/
+
+HPSOCKET_API BOOL __HP_CALL HP_ThreadPool_HasStarted(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->HasStarted();
+}
+
+HPSOCKET_API EnServiceState	__HP_CALL HP_ThreadPool_GetState(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->GetState();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_ThreadPool_GetQueueSize(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->GetQueueSize();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_ThreadPool_GetThreadCount(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->GetThreadCount();
+}
+
+HPSOCKET_API DWORD __HP_CALL HP_ThreadPool_GetMaxQueueSize(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->GetMaxQueueSize();
+}
+
+HPSOCKET_API EnRejectedPolicy __HP_CALL HP_ThreadPool_GetRejectedPolicy(HP_ThreadPool pThreadPool)
+{
+	return ((IHPThreadPool*)pThreadPool)->GetRejectedPolicy();
+}

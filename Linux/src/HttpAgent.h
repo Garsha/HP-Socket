@@ -37,12 +37,22 @@ template<class T, USHORT default_port> class CHttpAgentT : public IComplexHttpRe
 
 public:
 	using __super::Stop;
+	using __super::GetState;
 	using __super::SendPackets;
 	using __super::HasStarted;
 	using __super::GetRemoteHost;
 	using __super::GetFreeSocketObjLockTime;
 	using __super::GetFreeSocketObjPool;
 	using __super::GetFreeSocketObjHold;
+
+	using __super::IsSecure;
+	using __super::FireHandShake;
+	using __super::FindSocketObj;
+
+#ifdef _SSL_SUPPORT
+	using __super::StartSSLHandShake;
+	using __super::IsSSLAutoHandShake;
+#endif
 
 protected:
 	using CHttpObjPool	= CHttpObjPoolT<FALSE, CHttpAgentT, TAgentSocketObj>;
@@ -53,6 +63,7 @@ protected:
 public:
 	virtual BOOL SendRequest(CONNID dwConnID, LPCSTR lpszMethod, LPCSTR lpszPath, const THeader lpHeaders[] = nullptr, int iHeaderCount = 0, const BYTE* pBody = nullptr, int iLength = 0);
 	virtual BOOL SendLocalFile(CONNID dwConnID, LPCSTR lpszFileName, LPCSTR lpszMethod, LPCSTR lpszPath, const THeader lpHeaders[] = nullptr, int iHeaderCount = 0);
+	virtual BOOL SendChunkData(CONNID dwConnID, const BYTE* pData = nullptr, int iLength = 0, LPCSTR lpszExtensions = nullptr);
 
 	virtual BOOL SendPost(CONNID dwConnID, LPCSTR lpszPath, const THeader lpHeaders[], int iHeaderCount, const BYTE* pBody, int iLength)
 		{return SendRequest(dwConnID, HTTP_METHOD_POST, lpszPath, lpHeaders, iHeaderCount, pBody, iLength);}
@@ -73,9 +84,14 @@ public:
 	virtual BOOL SendConnect(CONNID dwConnID, LPCSTR lpszHost, const THeader lpHeaders[] = nullptr, int iHeaderCount = 0)
 		{return SendRequest(dwConnID, HTTP_METHOD_CONNECT, lpszHost, lpHeaders, iHeaderCount);}
 
-	virtual BOOL SendWSMessage(CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4] = nullptr, BYTE* pData = nullptr, int iLength = 0, ULONGLONG ullBodyLen = 0);
+	virtual BOOL SendWSMessage(CONNID dwConnID, BOOL bFinal, BYTE iReserved, BYTE iOperationCode, const BYTE lpszMask[4], const BYTE* pData = nullptr, int iLength = 0, ULONGLONG ullBodyLen = 0);
+
+	virtual BOOL StartHttp(CONNID dwConnID);
 
 public:
+	virtual void SetHttpAutoStart(BOOL bAutoStart)				{m_bHttpAutoStart = bAutoStart;}
+	virtual BOOL IsHttpAutoStart()								{return m_bHttpAutoStart;}
+
 	virtual void SetUseCookie(BOOL bUseCookie)					{m_pCookieMgr = bUseCookie ? &g_CookieMgr : nullptr;}
 	virtual BOOL IsUseCookie()									{return m_pCookieMgr != nullptr;}
 
@@ -105,8 +121,13 @@ public:
 	virtual BOOL GetWSMessageState(CONNID dwConnID, BOOL* lpbFinal, BYTE* lpiReserved, BYTE* lpiOperationCode, LPCBYTE* lpszMask, ULONGLONG* lpullBodyLen, ULONGLONG* lpullBodyRemain);
 
 private:
+	BOOL StartHttp(TAgentSocketObj* pSocketObj);
+	void DoStartHttp(TAgentSocketObj* pSocketObj);
+
+private:
 	virtual BOOL CheckParams();
 	virtual void PrepareStart();
+	virtual EnHandleResult FireConnect(TAgentSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireConnect(TAgentSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireHandShake(TAgentSocketObj* pSocketObj);
 	virtual EnHandleResult DoFireReceive(TAgentSocketObj* pSocketObj, const BYTE* pData, int iLength);
@@ -157,6 +178,7 @@ public:
 	: T					(pListener)
 	, m_pListener		(pListener)
 	, m_pCookieMgr		(&g_CookieMgr)
+	, m_bHttpAutoStart	(TRUE)
 	, m_enLocalVersion	(DEFAULT_HTTP_VERSION)
 	{
 
@@ -164,13 +186,15 @@ public:
 
 	virtual ~CHttpAgentT()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
 	IHttpAgentListener*	m_pListener;
 	CCookieMgr*			m_pCookieMgr;
 	EnHttpVersion		m_enLocalVersion;
+
+	BOOL				m_bHttpAutoStart;
 
 	CHttpObjPool		m_objPool;
 };

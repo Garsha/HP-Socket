@@ -2,11 +2,11 @@
  * Copyright: JessMA Open Source (ldcsaa@gmail.com)
  *
  * Author	: Bruce Liang
- * Website	: http://www.jessma.org
- * Project	: https://github.com/ldcsaa
+ * Website	: https://github.com/ldcsaa
+ * Project	: https://github.com/ldcsaa/HP-Socket/HP-Socket
  * Blog		: http://www.cnblogs.com/ldcsaa
  * Wiki		: http://www.oschina.net/p/hp-socket
- * QQ Group	: 75375912, 44636872
+ * QQ Group	: 44636872, 75375912
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -222,7 +222,7 @@ public:
 		if(h != m_h)
 		{
 			if(is_valid())
-				VERIFY(::CloseHandle(m_h));
+				ENSURE(::CloseHandle(m_h));
 
 			set(h);
 		}
@@ -415,9 +415,9 @@ public:
 			if(is_valid())
 			{
 				if(m_is_create)
-					VERIFY(::DeleteDC(m_h));
+					ENSURE(::DeleteDC(m_h));
 				else
-					VERIFY(::ReleaseDC(m_w, m_h));
+					ENSURE(::ReleaseDC(m_w, m_h));
 			}
 
 			set(h, w, is_create);
@@ -480,12 +480,12 @@ class paint_dc
 public:
 	paint_dc(HWND hwnd) : m_hwnd(hwnd)
 	{
-		VERIFY(m_hdc = ::BeginPaint(m_hwnd, &m_ps));
+		ENSURE(m_hdc = ::BeginPaint(m_hwnd, &m_ps));
 	}
 
 	~paint_dc()
 	{
-		VERIFY(::EndPaint(m_hwnd, &m_ps));
+		ENSURE(::EndPaint(m_hwnd, &m_ps));
 	}
 
 	operator HDC ()	const	{return m_hdc;}
@@ -515,7 +515,7 @@ public:
 		{
 			if(is_valid())
 			{
-				VERIFY(::DeleteObject(m_obj));
+				ENSURE(::DeleteObject(m_obj));
 			}
 
 			set(obj);

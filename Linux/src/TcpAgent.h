@@ -32,7 +32,7 @@ class CTcpAgent : public ITcpAgent, private CIOHandler
 public:
 	virtual BOOL Start	(LPCTSTR lpszBindAddress = nullptr, BOOL bAsyncConnect = TRUE);
 	virtual BOOL Stop	();
-	virtual BOOL Connect(LPCTSTR lpszRemoteAddress, USHORT usPort, CONNID* pdwConnID = nullptr, PVOID pExtra = nullptr);
+	virtual BOOL Connect(LPCTSTR lpszRemoteAddress, USHORT usPort, CONNID* pdwConnID = nullptr, PVOID pExtra = nullptr, USHORT usLocalPort = 0, LPCTSTR lpszLocalAddress = nullptr);
 	virtual BOOL Send	(CONNID dwConnID, const BYTE* pBuffer, int iLength, int iOffset = 0);
 	virtual BOOL SendSmallFile	(CONNID dwConnID, LPCTSTR lpszFileName, const LPWSABUF pHead = nullptr, const LPWSABUF pTail = nullptr);
 	virtual BOOL SendPackets	(CONNID dwConnID, const WSABUF pBuffers[], int iCount)	{return DoSendPackets(dwConnID, pBuffers, iCount);}
@@ -46,6 +46,7 @@ public:
 	virtual BOOL			GetRemoteAddress			(CONNID dwConnID, TCHAR lpszAddress[], int& iAddressLen, USHORT& usPort);
 	virtual BOOL			GetRemoteHost				(CONNID dwConnID, TCHAR lpszHost[], int& iHostLen, USHORT& usPort);
 
+	virtual BOOL IsConnected			(CONNID dwConnID);
 	virtual BOOL IsPauseReceive			(CONNID dwConnID, BOOL& bPaused);
 	virtual BOOL GetPendingDataLength	(CONNID dwConnID, int& iPending);
 	virtual DWORD GetConnectionCount	();
@@ -55,6 +56,20 @@ public:
 	virtual EnSocketError GetLastError	()	{return m_enLastError;}
 	virtual LPCTSTR GetLastErrorDesc	()	{return ::GetSocketErrorDesc(m_enLastError);}
 
+#ifdef _SSL_SUPPORT
+	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPassword = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)	{return FALSE;}
+	virtual BOOL SetupSSLContextByMemory(int iVerifyMode = SSL_VM_NONE, LPCSTR lpszPemCert = nullptr, LPCSTR lpszPemKey = nullptr, LPCSTR lpszKeyPassword = nullptr, LPCSTR lpszCAPemCert = nullptr)						{return FALSE;}
+	virtual void CleanupSSLContext	()						{}
+
+	virtual BOOL StartSSLHandShake	(CONNID dwConnID)		{return FALSE;}
+	virtual void SetSSLAutoHandShake(BOOL bAutoHandShake)	{}
+	virtual BOOL IsSSLAutoHandShake	()						{return FALSE;}
+	virtual BOOL GetSSLSessionInfo(CONNID dwConnID, EnSSLSessionInfo enInfo, LPVOID* lppInfo)	{return FALSE;}
+
+protected:
+	virtual BOOL StartSSLHandShake	(TAgentSocketObj* pSocketObj)	{return FALSE;}
+#endif
+
 private:
 	virtual BOOL OnBeforeProcessIo(PVOID pv, UINT events)			override;
 	virtual VOID OnAfterProcessIo(PVOID pv, UINT events, BOOL rs)	override;
@@ -63,12 +78,8 @@ private:
 	virtual BOOL OnReadyWrite(PVOID pv, UINT events)				override;
 	virtual BOOL OnHungUp(PVOID pv, UINT events)					override;
 	virtual BOOL OnError(PVOID pv, UINT events)						override;
+	virtual VOID OnDispatchThreadStart(THR_ID tid)					override;
 	virtual VOID OnDispatchThreadEnd(THR_ID tid)					override;
-
-#ifdef _SSL_SUPPORT
-	virtual BOOL SetupSSLContext	(int iVerifyMode = SSL_VM_NONE, LPCTSTR lpszPemCertFile = nullptr, LPCTSTR lpszPemKeyFile = nullptr, LPCTSTR lpszKeyPasswod = nullptr, LPCTSTR lpszCAPemCertFileOrPath = nullptr)	{return FALSE;}
-	virtual void CleanupSSLContext	()																																													{}
-#endif
 
 public:
 	virtual BOOL IsSecure				() {return FALSE;}
@@ -76,7 +87,8 @@ public:
 	virtual BOOL SetConnectionExtra(CONNID dwConnID, PVOID pExtra);
 	virtual BOOL GetConnectionExtra(CONNID dwConnID, PVOID* ppExtra);
 
-	virtual void SetSendPolicy				(EnSendPolicy enSendPolicy)		{m_enSendPolicy				= enSendPolicy;}
+	virtual void SetSendPolicy				(EnSendPolicy enSendPolicy)				{m_enSendPolicy			= enSendPolicy;}
+	virtual void SetOnSendSyncPolicy		(EnOnSendSyncPolicy enOnSendSyncPolicy)	{m_enOnSendSyncPolicy	= enOnSendSyncPolicy;}
 	virtual void SetMaxConnectionCount		(DWORD dwMaxConnectionCount)	{m_dwMaxConnectionCount		= dwMaxConnectionCount;}
 	virtual void SetWorkerThreadCount		(DWORD dwWorkerThreadCount)		{m_dwWorkerThreadCount		= dwWorkerThreadCount;}
 	virtual void SetSocketBufferSize		(DWORD dwSocketBufferSize)		{m_dwSocketBufferSize		= dwSocketBufferSize;}
@@ -90,7 +102,8 @@ public:
 	virtual void SetReuseAddress			(BOOL bReuseAddress)			{m_bReuseAddress			= bReuseAddress;}
 	virtual void SetMarkSilence				(BOOL bMarkSilence)				{m_bMarkSilence				= bMarkSilence;}
 
-	virtual EnSendPolicy GetSendPolicy		()	{return m_enSendPolicy;}
+	virtual EnSendPolicy GetSendPolicy				()	{return m_enSendPolicy;}
+	virtual EnOnSendSyncPolicy GetOnSendSyncPolicy	()	{return m_enOnSendSyncPolicy;}
 	virtual DWORD GetMaxConnectionCount		()	{return m_dwMaxConnectionCount;}
 	virtual DWORD GetWorkerThreadCount		()	{return m_dwWorkerThreadCount;}
 	virtual DWORD GetSocketBufferSize		()	{return m_dwSocketBufferSize;}
@@ -148,6 +161,9 @@ protected:
 	virtual void PrepareStart();
 	virtual void Reset();
 
+	virtual BOOL BeforeUnpause(TAgentSocketObj* pSocketObj) {return TRUE;}
+
+	virtual void OnWorkerThreadStart(THR_ID tid) {}
 	virtual void OnWorkerThreadEnd(THR_ID tid) {}
 
 	BOOL DoSendPackets(CONNID dwConnID, const WSABUF pBuffers[], int iCount);
@@ -185,13 +201,13 @@ private:
 	void DeleteSocketObj	(TAgentSocketObj* pSocketObj);
 	BOOL InvalidSocketObj	(TAgentSocketObj* pSocketObj);
 	void ReleaseGCSocketObj	(BOOL bForce = FALSE);
-	void AddClientSocketObj	(CONNID dwConnID, TAgentSocketObj* pSocketObj);
+	void AddClientSocketObj	(CONNID dwConnID, TAgentSocketObj* pSocketObj, const HP_SOCKADDR& remoteAddr, LPCTSTR lpszRemoteAddress, PVOID pExtra);
 	void CloseClientSocketObj(TAgentSocketObj* pSocketObj, EnSocketCloseFlag enFlag = SCF_NONE, EnSocketOperation enOperation = SO_UNKNOWN, int iErrorCode = 0, int iShutdownFlag = SHUT_WR);
 
 private:
-	int CreateClientSocket(LPCTSTR lpszRemoteAddress, USHORT usPort, SOCKET& soClient, HP_SOCKADDR& addr);
+	int CreateClientSocket(LPCTSTR lpszRemoteAddress, USHORT usPort, LPCTSTR lpszLocalAddress, USHORT usLocalPort, SOCKET& soClient, HP_SOCKADDR& addr);
 	int PrepareConnect	(CONNID& dwConnID, SOCKET soClient);
-	int ConnectToServer	(CONNID dwConnID, LPCTSTR lpszRemoteAddress, USHORT usPort, SOCKET soClient, const HP_SOCKADDR& addr, PVOID pExtra);
+	int ConnectToServer	(CONNID dwConnID, LPCTSTR lpszRemoteAddress, SOCKET soClient, const HP_SOCKADDR& addr, PVOID pExtra);
 
 	VOID HandleCmdSend		(CONNID dwConnID);
 	VOID HandleCmdUnpause	(CONNID dwConnID);
@@ -211,7 +227,8 @@ public:
 	, m_enState					(SS_STOPPED)
 	, m_bAsyncConnect			(TRUE)
 	, m_enSendPolicy			(SP_PACK)
-	, m_dwMaxConnectionCount	(DEFAULT_MAX_CONNECTION_COUNT)
+	, m_enOnSendSyncPolicy		(OSSP_NONE)
+	, m_dwMaxConnectionCount	(DEFAULT_CONNECTION_COUNT)
 	, m_dwWorkerThreadCount		(DEFAULT_WORKER_THREAD_COUNT)
 	, m_dwSocketBufferSize		(DEFAULT_TCP_SOCKET_BUFFER_SIZE)
 	, m_dwFreeSocketObjLockTime	(DEFAULT_FREE_SOCKETOBJ_LOCK_TIME)
@@ -230,11 +247,12 @@ public:
 
 	virtual ~CTcpAgent()
 	{
-		Stop();
+		ENSURE_STOP();
 	}
 
 private:
 	EnSendPolicy m_enSendPolicy;
+	EnOnSendSyncPolicy m_enOnSendSyncPolicy;
 	DWORD m_dwMaxConnectionCount;
 	DWORD m_dwWorkerThreadCount;
 	DWORD m_dwSocketBufferSize;
